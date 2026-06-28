@@ -2,6 +2,9 @@
 
 All connections use female-to-female dupont jumper wires (2.54mm).
 
+**Schematic diagram:** [docs/wiring-diagram.svg](docs/wiring-diagram.svg) —
+all signals colour-matched to the jumper-wire convention below.
+
 ## E-ink display (Waveshare 7.5" BWR HAT)
 
 | HAT Pin | Signal | nanoESP32-C6 | Wire colour |

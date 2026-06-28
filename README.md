@@ -115,6 +115,79 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 
 ---
 
+## Wiring
+
+Full schematic: [docs/wiring-diagram.svg](docs/wiring-diagram.svg). Open it
+in a browser for a zoomable view.
+
+[![Wiring diagram](docs/wiring-diagram.svg)](docs/wiring-diagram.svg)
+
+All connections are female-to-female 2.54 mm dupont jumpers, no soldering
+required. See [WIRING.md](WIRING.md) for the same data in plain tables and
+the wire-colour convention used in the diagram.
+
+### E-paper display (Waveshare 7.5" BWR HAT — required)
+
+| HAT pin | Signal | nanoESP32-C6 | Wire |
+|---------|--------|--------------|------|
+| VCC     | 3.3 V  | **3V3**      | red |
+| GND     | Ground | **GND**      | black |
+| DIN     | MOSI   | **GPIO7**    | blue |
+| CLK     | SPI clock | **GPIO6** | yellow |
+| CS      | Chip select | **GPIO5** | orange |
+| DC      | Data/command | **GPIO4** | green |
+| RST     | Reset  | **GPIO3**    | purple |
+| BUSY    | Busy   | **GPIO2**    | grey |
+
+> ⚠️ VCC **must** be 3.3 V — never 5 V. The panel is the only required peripheral.
+
+### Manual refresh button (recommended)
+
+| Button | nanoESP32-C6 |
+|--------|--------------|
+| leg 1  | **GPIO0**    |
+| leg 2  | **GND**      |
+
+Mapped to `button.refresh_calendar` in HA. Internal pull-up; no external resistor needed.
+
+### Audio out — MAX98357A I²S DAC + 4–8 Ω speaker (optional)
+
+| DAC pin | nanoESP32-C6 | Wire |
+|---------|--------------|------|
+| VIN     | **3V3**      | red |
+| GND     | **GND**      | black |
+| BCLK    | **GPIO18**   | blue |
+| LRC     | **GPIO19**   | yellow |
+| DIN     | **GPIO20**   | orange |
+| SPK+/SPK− | speaker terminals | — |
+
+### Microphone — INMP441 I²S MEMS (optional)
+
+| Mic pin | nanoESP32-C6 | Wire |
+|---------|--------------|------|
+| VDD     | **3V3**      | red |
+| GND     | **GND**      | black |
+| SCK     | **GPIO21**   | blue |
+| WS      | **GPIO22**   | yellow |
+| SD      | **GPIO23**   | orange |
+| L/R     | **GND**      | black (tied to GND for left-channel) |
+
+### Reserved / free pins
+
+| GPIO    | Status                                                |
+|---------|-------------------------------------------------------|
+| GPIO8   | **Reserved** — onboard WS2812B RGB status LED         |
+| GPIO9   | **Reserved** — BOOT button on the board               |
+| GPIO1, GPIO10–13, GPIO15, RX, TX | Free for future expansion |
+
+### Power
+
+Single USB-C into either port — bottom **native USB-C** for wall power, top
+**CH343** port for flashing via cable to a host. Both provide 5 V to the
+onboard regulator; the display ties off the regulated 3.3 V rail.
+
+---
+
 ## Updating the calendar layout
 
 All rendering lives in the `display:` lambda in [esphome/esp32connector.yaml](esphome/esp32connector.yaml).

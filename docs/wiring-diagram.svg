@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1080" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <!--
+       home-calendar wiring diagram
+       nanoESP32-C6 (MuseLab v1.0)
+        + Waveshare 7.5" e-Paper HAT (B) BWR 800x480 (WS-13505)
+        + MAX98357A I2S DAC + speaker (optional)
+        + INMP441 I2S MEMS mic (optional)
+        + tactile push-button on GPIO0
+       Layout: peripherals are placed on the SAME side as the ESP pins they
+       connect to, so jumper wires run as straight short segments with no
+       crossings over the board.
+  -->
+
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="1080" fill="#f7f7f5"/>
+
+  <!-- TITLE / LEGEND -->
+  <text x="40" y="50" font-size="28" font-weight="700" fill="#111">home-calendar — wiring diagram</text>
+  <text x="40" y="78" font-size="14" fill="#555">
+    nanoESP32-C6 · Waveshare 7.5" e-Paper HAT (B) · INMP441 mic · MAX98357A DAC + speaker · push-button
+  </text>
+
+  <g transform="translate(900,40)" font-size="12" fill="#222">
+    <text x="0" y="0" font-weight="700" font-size="13" fill="#111">Wire colours</text>
+    <g transform="translate(0,14)">
+      <rect x="0"   y="0" width="24" height="8" fill="#d62828"/><text x="32"  y="8">3V3 / VCC / VDD</text>
+      <rect x="160" y="0" width="24" height="8" fill="#111"/>   <text x="192" y="8">GND</text>
+      <rect x="240" y="0" width="24" height="8" fill="#1e6fd9"/><text x="272" y="8">MOSI / DIN / BCLK / SCK</text>
+      <rect x="450" y="0" width="24" height="8" fill="#e0c50a"/><text x="482" y="8">CLK / LRC / WS</text>
+    </g>
+    <g transform="translate(0,34)">
+      <rect x="0"   y="0" width="24" height="8" fill="#e67e22"/><text x="32"  y="8">CS / DAC DIN / Mic SD</text>
+      <rect x="200" y="0" width="24" height="8" fill="#27ae60"/><text x="232" y="8">DC</text>
+      <rect x="260" y="0" width="24" height="8" fill="#8e44ad"/><text x="292" y="8">RST</text>
+      <rect x="320" y="0" width="24" height="8" fill="#7f8c8d"/><text x="352" y="8">BUSY</text>
+      <rect x="400" y="0" width="24" height="8" fill="#e91e63"/><text x="432" y="8">Button signal</text>
+    </g>
+  </g>
+
+  <!-- ================== WIRES ================== -->
+  <!-- Coordinate reference (after group translations):
+       ESP left pins:  x = 618 (rect right edge)
+         GND  y=261, 3V3 y=301, GPIO0 y=341,
+         GPIO21 y=721, GPIO22 y=761, GPIO23 y=801
+       ESP right pins: x = 870 (rect left edge of header pad)
+         3V3 y=261, GND y=301, BUSY y=341, RST y=371, DC y=401,
+         CS y=431, CLK y=461, DIN y=491,
+         BCLK y=721, LRC y=761, DIN y=801
+       Display header pads: x = 1026 (left edge)
+         VCC y=388, GND y=398, DIN y=408, CLK y=418, CS y=428,
+         DC y=438, RST y=448, BUSY y=458
+       DAC pads: x = 1026, y from 710..790 in steps of 20
+         VIN y=710, GND y=730, BCLK y=750, LRC y=770, DIN y=790
+       Mic pads: x = 304 (right edge), y from 420..530 in steps of 20
+         VDD y=420, GND y=440, SCK y=460, WS y=480, SD y=500, L/R y=520
+       Button pads: x = 434, leg1 y=856, leg2 y=886
+  -->
+
+  <g fill="none" stroke-width="3" stroke-linecap="round">
+
+    <!-- ===== DISPLAY (8 wires, ESP right rail -> driver header) ===== -->
+    <!-- 3V3   ESP(870,261) -> VCC(1026,388) -->
+    <path d="M870 261 C 940 261, 960 388, 1026 388" stroke="#d62828"/>
+    <!-- GND   ESP(870,301) -> GND(1026,398) -->
+    <path d="M870 301 C 940 301, 960 398, 1026 398" stroke="#111"/>
+    <!-- BUSY  ESP(870,341) -> BUSY(1026,458) -->
+    <path d="M870 341 C 940 341, 960 458, 1026 458" stroke="#7f8c8d"/>
+    <!-- RST   ESP(870,371) -> RST(1026,448) -->
+    <path d="M870 371 C 940 371, 960 448, 1026 448" stroke="#8e44ad"/>
+    <!-- DC    ESP(870,401) -> DC(1026,438) -->
+    <path d="M870 401 C 940 401, 960 438, 1026 438" stroke="#27ae60"/>
+    <!-- CS    ESP(870,431) -> CS(1026,428) -->
+    <path d="M870 431 C 940 431, 960 428, 1026 428" stroke="#e67e22"/>
+    <!-- CLK   ESP(870,461) -> CLK(1026,418) -->
+    <path d="M870 461 C 940 461, 960 418, 1026 418" stroke="#e0c50a"/>
+    <!-- DIN   ESP(870,491) -> DIN(1026,408) -->
+    <path d="M870 491 C 940 491, 960 408, 1026 408" stroke="#1e6fd9"/>
+
+    <!-- ===== DAC (5 wires, ESP right rail -> DAC left pads) ===== -->
+    <!-- VIN   ESP(870,261) -> DAC VIN(1026,710) -->
+    <path d="M870 261 C 940 500, 950 710, 1026 710" stroke="#d62828"/>
+    <!-- GND   ESP(870,301) -> DAC GND(1026,730) -->
+    <path d="M870 301 C 940 530, 950 730, 1026 730" stroke="#111"/>
+    <!-- BCLK  ESP(870,721) -> DAC BCLK(1026,750) -->
+    <path d="M870 721 C 930 721, 970 750, 1026 750" stroke="#1e6fd9"/>
+    <!-- LRC   ESP(870,761) -> DAC LRC(1026,770) -->
+    <path d="M870 761 C 930 761, 970 770, 1026 770" stroke="#e0c50a"/>
+    <!-- DIN   ESP(870,801) -> DAC DIN(1026,790) -->
+    <path d="M870 801 C 930 801, 970 790, 1026 790" stroke="#e67e22"/>
+
+    <!-- ===== MIC (6 wires, ESP left rail -> mic right pads) ===== -->
+    <!-- VDD   ESP(618,301) -> mic VDD(304,420) -->
+    <path d="M618 301 C 540 301, 380 420, 304 420" stroke="#d62828"/>
+    <!-- GND   ESP(618,261) -> mic GND(304,440) -->
+    <path d="M618 261 C 540 261, 380 440, 304 440" stroke="#111"/>
+    <!-- SCK   ESP(618,721) -> mic SCK(304,460) -->
+    <path d="M618 721 C 500 600, 380 460, 304 460" stroke="#1e6fd9"/>
+    <!-- WS    ESP(618,761) -> mic WS(304,480) -->
+    <path d="M618 761 C 500 620, 380 480, 304 480" stroke="#e0c50a"/>
+    <!-- SD    ESP(618,801) -> mic SD(304,500) -->
+    <path d="M618 801 C 500 650, 380 500, 304 500" stroke="#e67e22"/>
+
+    <!-- ===== BUTTON (2 wires, ESP left rail -> button right pads) ===== -->
+    <!-- GPIO0 signal  ESP(618,341) -> button leg1(434,856) -->
+    <path d="M618 341 C 520 341, 480 700, 434 856" stroke="#e91e63"/>
+    <!-- GND          ESP(618,261) -> button leg2(434,886) -->
+    <path d="M618 261 C 480 261, 460 800, 434 886" stroke="#111"/>
+  </g>
+
+  <!-- ================== nanoESP32-C6 BOARD (center) ================== -->
+  <g transform="translate(630,200)">
+    <rect x="0" y="0" width="240" height="700" rx="14" ry="14"
+          fill="#1f3a5f" stroke="#0d203f" stroke-width="2" filter="url(#shadow)"/>
+    <!-- USB-C top -->
+    <rect x="92"  y="-14" width="56" height="20" rx="4" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="120" y="-22" font-size="11" text-anchor="middle" fill="#555">USB-C (CH343 / flash)</text>
+    <!-- USB-C bottom -->
+    <rect x="92"  y="694" width="56" height="20" rx="4" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="120" y="734" font-size="11" text-anchor="middle" fill="#555">USB-C (native, wall power)</text>
+
+    <!-- ESP32-C6 module shape -->
+    <rect x="60" y="280" width="120" height="140" rx="6" fill="#0d203f" stroke="#4a6a90"/>
+    <text x="120" y="330" font-size="14" font-weight="700" fill="#e6e6e6" text-anchor="middle">ESP32-C6</text>
+    <text x="120" y="350" font-size="11" fill="#a8b8cc" text-anchor="middle">RISC-V 160 MHz</text>
+    <text x="120" y="368" font-size="11" fill="#a8b8cc" text-anchor="middle">Wi-Fi 6 · BLE 5 · 802.15.4</text>
+
+    <!-- RGB LED (GPIO8) -->
+    <circle cx="84" cy="270" r="5" fill="#ff4d6d" stroke="#7a0e2c"/>
+    <text x="94" y="274" font-size="10" fill="#e6e6e6">RGB (GPIO8)</text>
+    <!-- BOOT button (GPIO9) -->
+    <rect x="148" y="262" width="14" height="12" rx="2" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="144" y="271" font-size="10" fill="#e6e6e6" text-anchor="end">BOOT</text>
+
+    <!-- Board name -->
+    <text x="120" y="466" font-size="14" font-weight="700" fill="#e6e6e6" text-anchor="middle">nanoESP32-C6</text>
+    <text x="120" y="484" font-size="11" fill="#a8b8cc" text-anchor="middle">MuseLab v1.0</text>
+
+    <!-- LEFT-SIDE pin header — goes to mic + button -->
+    <g class="pinlabels" font-size="12" fill="#e6e6e6">
+      <!-- y=60  GND (used by mic GND + button GND) -->
+      <rect x="-12" y="56" width="14" height="10" fill="#111" stroke="#444"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="65" text-anchor="end">GND</text>
+      <!-- y=100 3V3 (used by mic VDD) -->
+      <rect x="-12" y="96" width="14" height="10" fill="#d62828" stroke="#7a0e0e"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="105" text-anchor="end">3V3</text>
+      <!-- y=140 GPIO0 (button) -->
+      <rect x="-12" y="136" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="145" text-anchor="end">GPIO0</text>
+      <!-- gap -->
+      <!-- y=520 GPIO21 mic SCK -->
+      <rect x="-12" y="516" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="525" text-anchor="end">GPIO21</text>
+      <!-- y=560 GPIO22 mic WS -->
+      <rect x="-12" y="556" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="565" text-anchor="end">GPIO22</text>
+      <!-- y=600 GPIO23 mic SD -->
+      <rect x="-12" y="596" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="605" text-anchor="end">GPIO23</text>
+    </g>
+
+    <!-- RIGHT-SIDE pin header — goes to display + DAC -->
+    <g class="pinlabels" font-size="12" fill="#e6e6e6">
+      <!-- y=60 3V3 (display VCC + DAC VIN) -->
+      <rect x="238" y="56"  width="14" height="10" fill="#d62828" stroke="#7a0e0e"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="65">3V3</text>
+      <!-- y=100 GND -->
+      <rect x="238" y="96"  width="14" height="10" fill="#111" stroke="#444"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="105">GND</text>
+      <!-- y=140 GPIO2 BUSY -->
+      <rect x="238" y="136" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="145">GPIO2  (BUSY)</text>
+      <!-- y=170 GPIO3 RST -->
+      <rect x="238" y="166" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="175">GPIO3  (RST)</text>
+      <!-- y=200 GPIO4 DC -->
+      <rect x="238" y="196" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="205">GPIO4  (DC)</text>
+      <!-- y=230 GPIO5 CS -->
+      <rect x="238" y="226" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="235">GPIO5  (CS)</text>
+      <!-- y=260 GPIO6 CLK -->
+      <rect x="238" y="256" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="265">GPIO6  (CLK)</text>
+      <!-- y=290 GPIO7 DIN -->
+      <rect x="238" y="286" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="295">GPIO7  (DIN / MOSI)</text>
+      <!-- y=520 GPIO18 DAC BCLK -->
+      <rect x="238" y="516" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="525">GPIO18 (DAC BCLK)</text>
+      <!-- y=560 GPIO19 DAC LRC -->
+      <rect x="238" y="556" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="565">GPIO19 (DAC LRC)</text>
+      <!-- y=600 GPIO20 DAC DIN -->
+      <rect x="238" y="596" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="258" y="605">GPIO20 (DAC DIN)</text>
+    </g>
+  </g>
+
+  <!-- ================== Waveshare 7.5" display + driver (top-right) ================== -->
+  <g transform="translate(1040,140)">
+    <!-- Panel -->
+    <rect x="0" y="0" width="380" height="220" rx="6" fill="#e9e6dd" stroke="#9c9079" stroke-width="2" filter="url(#shadow)"/>
+    <text x="190" y="98" font-size="22" font-weight="700" fill="#333" text-anchor="middle">Waveshare 7.5"</text>
+    <text x="190" y="124" font-size="14" fill="#666" text-anchor="middle">e-Paper HAT (B) · BWR · 800×480</text>
+    <text x="190" y="146" font-size="12" fill="#888" text-anchor="middle">WS-13505 · model 7.50in-bv2</text>
+    <text x="190" y="198" font-size="11" fill="#c0392b" text-anchor="middle">⚠ VCC must be 3.3 V — never 5 V</text>
+
+    <!-- Driver / adapter board -->
+    <rect x="40" y="248" width="300" height="70" rx="6" fill="#1f5f3a" stroke="#0d3f20" stroke-width="2" filter="url(#shadow)"/>
+    <text x="190" y="272" font-size="13" font-weight="700" fill="#e6e6e6" text-anchor="middle">Driver board (HAT adapter)</text>
+    <text x="190" y="290" font-size="11" fill="#bfe6c8" text-anchor="middle">8-pin header → ribbon to panel</text>
+
+    <!-- 8-pin header (left side of driver board) -->
+    <g class="pinlabels" font-size="11" fill="#e6e6e6">
+      <rect x="-14" y="248" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="257" text-anchor="end">VCC</text>
+      <rect x="-14" y="258" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="267" text-anchor="end">GND</text>
+      <rect x="-14" y="268" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="277" text-anchor="end">DIN</text>
+      <rect x="-14" y="278" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="287" text-anchor="end">CLK</text>
+      <rect x="-14" y="288" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="297" text-anchor="end">CS</text>
+      <rect x="-14" y="298" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="307" text-anchor="end">DC</text>
+      <rect x="-14" y="308" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="317" text-anchor="end">RST</text>
+      <rect x="-14" y="318" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="327" text-anchor="end">BUSY</text>
+    </g>
+  </g>
+
+  <!-- ================== MAX98357A DAC + speaker (mid-right) ================== -->
+  <g transform="translate(1040,690)">
+    <rect x="0" y="0" width="170" height="120" rx="6" fill="#5f1f3a" stroke="#3f0d20" stroke-width="2" filter="url(#shadow)"/>
+    <text x="85" y="32" font-size="13" font-weight="700" fill="#e6e6e6" text-anchor="middle">MAX98357A</text>
+    <text x="85" y="50" font-size="11" fill="#e6cdd8" text-anchor="middle">I²S DAC + amplifier</text>
+    <text x="85" y="108" font-size="10" fill="#e6cdd8" text-anchor="middle">(optional)</text>
+
+    <!-- LEFT pad column -->
+    <g class="pinlabels" font-size="11" fill="#e6e6e6">
+      <rect x="-14" y="20"  width="14" height="10" fill="#d62828" stroke="#7a0e0e"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="29" text-anchor="end">VIN</text>
+      <rect x="-14" y="40"  width="14" height="10" fill="#111"    stroke="#444"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="49" text-anchor="end">GND</text>
+      <rect x="-14" y="60"  width="14" height="10" fill="#5f1f3a" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="69" text-anchor="end">BCLK</text>
+      <rect x="-14" y="80"  width="14" height="10" fill="#5f1f3a" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="89" text-anchor="end">LRC</text>
+      <rect x="-14" y="100" width="14" height="10" fill="#5f1f3a" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="-18" y="109" text-anchor="end">DIN</text>
+    </g>
+
+    <!-- Speaker terminals -->
+    <g font-size="10" fill="#e6cdd8">
+      <rect x="170" y="40" width="14" height="10" fill="#5f1f3a" stroke="#aab"/><text x="190" y="49">SPK+</text>
+      <rect x="170" y="60" width="14" height="10" fill="#5f1f3a" stroke="#aab"/><text x="190" y="69">SPK−</text>
+    </g>
+
+    <!-- Speaker cone -->
+    <g transform="translate(240,15)">
+      <circle cx="60" cy="40" r="42" fill="#2c2c2c" stroke="#111" stroke-width="2" filter="url(#shadow)"/>
+      <circle cx="60" cy="40" r="22" fill="#1a1a1a" stroke="#000"/>
+      <circle cx="60" cy="40" r="8"  fill="#0a0a0a"/>
+      <text x="60" y="100" font-size="11" fill="#444" text-anchor="middle">4–8 Ω speaker</text>
+    </g>
+    <!-- Two short wires DAC -> speaker -->
+    <path d="M184 45 L246 50" stroke="#111" stroke-width="2" fill="none"/>
+    <path d="M184 65 L246 60" stroke="#111" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- ================== INMP441 mic (top-left) ================== -->
+  <g transform="translate(120,400)">
+    <rect x="0" y="0" width="170" height="140" rx="6" fill="#1f5f5f" stroke="#0d3f3f" stroke-width="2" filter="url(#shadow)"/>
+    <text x="85" y="32" font-size="13" font-weight="700" fill="#e6e6e6" text-anchor="middle">INMP441</text>
+    <text x="85" y="50" font-size="11" fill="#bfe6e6" text-anchor="middle">I²S MEMS microphone</text>
+    <text x="85" y="128" font-size="10" fill="#bfe6e6" text-anchor="middle">(optional)</text>
+    <circle cx="40" cy="80" r="6" fill="#0a2828" stroke="#555"/>
+
+    <!-- RIGHT pad column (facing the ESP32) -->
+    <g class="pinlabels" font-size="11" fill="#e6e6e6">
+      <rect x="170" y="20"  width="14" height="10" fill="#d62828" stroke="#7a0e0e"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="29"  text-anchor="start">VDD</text>
+      <rect x="170" y="40"  width="14" height="10" fill="#111"    stroke="#444"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="49"  text-anchor="start">GND</text>
+      <rect x="170" y="60"  width="14" height="10" fill="#1f5f5f" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="69"  text-anchor="start">SCK</text>
+      <rect x="170" y="80"  width="14" height="10" fill="#1f5f5f" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="89"  text-anchor="start">WS</text>
+      <rect x="170" y="100" width="14" height="10" fill="#1f5f5f" stroke="#aab"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="109" text-anchor="start">SD</text>
+      <rect x="170" y="120" width="14" height="10" fill="#111"    stroke="#444"/>   <text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="190" y="129" text-anchor="start">L/R → GND</text>
+    </g>
+    <!-- Internal jumper L/R to GND -->
+    <path d="M195 124 C 215 124, 215 50, 195 50" stroke="#111" stroke-width="2" stroke-dasharray="4 3" fill="none"/>
+  </g>
+
+  <!-- ================== Push-button (bottom-left) ================== -->
+  <g transform="translate(280,800)">
+    <rect x="0" y="0" width="140" height="110" rx="6" fill="#5f4d1f" stroke="#3f330d" stroke-width="2" filter="url(#shadow)"/>
+    <text x="70" y="26" font-size="13" font-weight="700" fill="#e6e6e6" text-anchor="middle">Push-button</text>
+    <text x="70" y="44" font-size="11" fill="#e6dec1" text-anchor="middle">manual refresh</text>
+    <!-- Button cap -->
+    <circle cx="70" cy="76" r="18" fill="#bdc3c7" stroke="#7f8c8d" stroke-width="2"/>
+    <circle cx="70" cy="76" r="8" fill="#7f8c8d"/>
+    <!-- Terminal pads on right side, facing ESP32 -->
+    <g class="pinlabels" font-size="10" fill="#e6e6e6">
+      <rect x="140" y="56" width="14" height="10" fill="#5f4d1f" stroke="#aab"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="160" y="65">leg 1</text>
+      <rect x="140" y="86" width="14" height="10" fill="#111"    stroke="#444"/><text style="paint-order:stroke;stroke:#f7f7f5;stroke-width:3;stroke-linejoin:round" x="160" y="95">leg 2</text>
+    </g>
+  </g>
+
+  <!-- ================== FOOTER NOTES ================== -->
+  <g font-size="12" fill="#333">
+    <rect x="40" y="980" width="1420" height="80" rx="6" fill="#ffffff" stroke="#ddd"/>
+    <text x="56" y="1006" font-weight="700">Reserved pins:</text>
+    <text x="56" y="1024">• GPIO8 — onboard WS2812B RGB status LED (driven by the ESPHome `light` component)</text>
+    <text x="56" y="1042">• GPIO9 — BOOT button on the board itself</text>
+    <text x="780" y="1006" font-weight="700">Free for expansion:</text>
+    <text x="780" y="1024">GPIO1, GPIO10, GPIO11, GPIO12, GPIO13, GPIO15, RX, TX</text>
+    <text x="780" y="1042">Both USB-C ports accept 5 V — top = CH343 (flash/serial), bottom = native USB (wall power).</text>
+  </g>
+
+</svg>
