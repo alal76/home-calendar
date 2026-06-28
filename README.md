@@ -6,6 +6,8 @@ Assistant. Home Assistant's built-in Google Calendar integration does the
 OAuth and event fetching; a template sensor pushes the events list to the
 device over the native API.
 
+Source: <https://github.com/alal76/home-calendar>
+
 ```
 Google Calendar ──► Home Assistant (your-home-assistant-host)
                        │  • Google Calendar integration  (OAuth + polling)
@@ -28,12 +30,16 @@ The ESP32 never talks to Google directly — only to Home Assistant.
 ```
 home-calendar/
 ├── esphome/
-│   ├── esp32connector.yaml      ← the device firmware (ESPHome YAML)
-│   ├── secrets.example.yaml     ← keys to add to /config/esphome/secrets.yaml
-│   └── README.md                ← deploy steps + HA template-sensor snippet
-├── WIRING.md                    ← pin map + cabling reference
+│   ├── esp32connector.yaml          ← the device firmware (ESPHome YAML)
+│   ├── components/preview_page/     ← local external_component
+│   │                                  serving GET /preview + /dash
+│   ├── secrets.example.yaml         ← keys to add to /config/esphome/secrets.yaml
+│   └── README.md                    ← deploy steps + HA template-sensor snippet
+├── scripts/                         ← dev helpers (browser preview, etc.)
+├── preview.html                     ← static preview snapshot (offline reference)
+├── WIRING.md                        ← pin map + cabling reference
 └── .github/
-    └── copilot-instructions.md  ← persistent Copilot context
+    └── copilot-instructions.md      ← persistent Copilot context
 ```
 
 ---
@@ -70,11 +76,42 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 | Layer       | Component                                                       |
 |-------------|-----------------------------------------------------------------|
 | Calendar    | Home Assistant Google Calendar integration (OAuth + token refresh) |
-| Bridge      | HA template sensor `sensor.calendar_events_json` (5-min trigger) re-runs `calendar.get_events` and stashes the result in an `events` attribute |
+| Bridge      | HA template sensor `sensor.calendar_events_json` (5-min trigger) re-runs `calendar.get_events` (-7d to +90d window) and stashes the result in an `events` attribute |
 | Transport   | ESPHome native API (encrypted) — device subscribes to the sensor attribute |
 | Device      | nanoESP32-C6 + Waveshare 7.5" HAT (B), pins in [WIRING.md](WIRING.md) |
 | Firmware    | ESPHome YAML + lambdas (see [esphome/esp32connector.yaml](esphome/esp32connector.yaml)) |
+| Web preview | Local `preview_page` external component exposes `GET /preview` + `/dash` on port 80 — JS-rendered SVG mirror of the e-paper layout |
+| Presence    | HA Companion App on each phone publishes `person.*` (and optionally `sensor.*_speed`); device subscribes and renders zone + speed |
+| Weather     | HA Met.no built-in (`weather.forecast_home`) — current condition + temperature |
 | Refresh     | 5-min HA cadence + on-demand `button.refresh_calendar` + full repaint (~15 s) |
+
+### Display layout (800×480)
+
+```
+┌────────────────────────────┬───────────────────┐   header strip
+│ Jun – Jul 2026   [<] [today] [>] │   Upcoming        │
+├────────────────────────────┤                   │
+│  Mo Tu We Th Fr Sa Su            │  Today · 14:30    │
+│  rolling 5-week grid             │  Tomorrow · 09:00 │   568 px grid
+│  (anchor row 3 = today's week)   │  …                │   232 px sidebar
+│                                  │                   │
+├────────────────────────────┴───────────────────┤
+│ Updated …   3 past   1 today   13 upcoming           │   80 px footer
+│ Next: 06 Jul · in 8d — Dentist appointment           │
+│ WiFi … · IP … · Up …         esp32connector v1.1.0  │
+│ Person A: home · Person B: home · Person C: home · Person D: home
+└─────────────────────────────────────────────────┘
+```
+
+- **5-week rolling window** — today is always in row 3; cells span
+  −2 weeks back to +2 weeks forward. Month boundaries show a small red
+  month label on the day-1 cell.
+- **Red** is used for accents only: header strip, today circle, event dots,
+  sidebar date labels.
+- **Footer row 4** shows each tracked person as `Label: zone (NN km/h)`. The
+  speed suffix is omitted if the speed sensor is unavailable or < 1 m/s.
+- **Version** is exposed to HA as the diagnostic
+  `sensor.<device>_home_calendar_version` (currently `1.1.0`).
 
 ---
 

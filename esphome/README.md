@@ -20,8 +20,19 @@ no longer the target build path.
 | OTA                  | `ArduinoOTA`                      | `ota:` (ESPHome dashboard, wireless)           |
 | Time / DST           | `configTzTime`                    | `time.sntp` with POSIX TZ string               |
 
-The visual layout is unchanged: 568 px month grid | 232 px upcoming list |
-80 px status bar, red for accents, full refresh only (BWR has no partial).
+The visual layout is **800×480**:
+
+- 568 px **5-week rolling month grid** (today always in row 3, −2 / +2 weeks
+  visible) | 232 px **upcoming list** | 80 px **4-row footer**
+- Red is accent only (header strip, today circle, event dots, sidebar date
+  labels, month-boundary label inside cells)
+- BWR has no partial refresh — every update is a full ~15 s repaint
+
+The device also exposes a local web preview at `http://<device>/preview`
+(and `/dash`) via the [`preview_page`](components/preview_page/) external
+component — a JS-rendered SVG mirror of the e-paper layout, plus an info
+card showing live wifi / RSSI / uptime / weather / sync status / people /
+firmware version. Useful for iterating on layout without burning a refresh.
 
 ---
 
@@ -133,10 +144,17 @@ minutes. Subsequent installs are fast.
 
 ## Things you'll likely need to tweak
 
-| What                              | Where in the yaml                                        |
+All tunables live in `substitutions:` at the top of
+[esp32connector.yaml](esp32connector.yaml).
+
+| What                              | Where                                                    |
 |-----------------------------------|----------------------------------------------------------|
 | HA calendar sensor entity id      | `substitutions.ha_events_entity`                         |
 | HA refresh script entity id       | `substitutions.ha_refresh_script`                        |
+| Firmware version (footer + HA)    | `substitutions.sw_version`                               |
+| People shown in footer (4 slots)  | `substitutions.person_{a,b,c,d}_entity` + `_label`       |
+| Speed sensors (optional, 4 slots) | `substitutions.speed_{a,b,c,d}_entity`                   |
+| Weather entity                    | `substitutions.weather_entity` (default `weather.forecast_home`) |
 | Refresh cadence (default 5 min)   | HA template sensor `time_pattern` trigger (in HA config) |
 | Timezone (currently CET/CEST)     | `substitutions.tz` (POSIX TZ string)                     |
 | BWR display model (v2 vs v3)      | `display[0].model` — try `7.50in-bv3` if v2 ghosts       |
@@ -144,6 +162,16 @@ minutes. Subsequent installs are fast.
 | Sidebar title truncation (22)     | `t.resize(21)` in the display lambda                     |
 | Sidebar max events (10)           | `shown < 10` check in the display lambda                 |
 | Grid max events per cell (3 dots) | `dots < 3` check in the display lambda                   |
+
+### Presence / speed sensors
+
+Each person slot pairs a `person.*` entity (zone state) with an optional
+`sensor.*_speed` entity. The HA Companion App **disables Speed by default**
+— enable it per phone via Companion App → Manage Sensors → Speed. The
+device tolerates missing / unavailable / unknown sensors and just omits the
+`(NN km/h)` suffix until a real value (≥ 1 m/s, i.e. ≳ 3.6 km/h) arrives.
+Non-Companion-App people (e.g. grandparents) can be fed via Life360 — just
+point a slot's `person_X_entity` at the resulting `device_tracker.life360_*`.
 
 ---
 

@@ -49,22 +49,47 @@ has been fully removed — do not suggest reintroducing it.
 - The firmware lives in [esphome/esp32connector.yaml](../esphome/esp32connector.yaml).
 - ESP32-C6 requires `framework: type: esp-idf` in ESPHome (the Arduino
   framework is still unstable on C6). Don't suggest `arduino`.
-- All tunable knobs go in `substitutions:` at the top of the yaml.
+- All tunable knobs go in `substitutions:` at the top of the yaml —
+  including `sw_version`, the 4 person/speed entity pairs, weather entity,
+  TZ, calendar sensor / refresh script entity ids.
 - Calendar data arrives via `text_sensor: platform: homeassistant` subscribing
   to `sensor.calendar_events_json` (attribute `events`). The `on_value:`
   lambda calls `json::parse_json` to populate globals. There is no HTTP
   client / `interval:` poll on the device.
 - Parsed events are stashed in `globals:` (`ev_titles`, `ev_starts`,
-  `ev_all_day`, `ev_count`) as fixed-size `std::array`s.
+  `ev_ends`, `ev_all_day`, `ev_count`) as fixed-size `std::array`s.
 - Display rendering is one large lambda on the `display:` component. Layout
-  is **568 px month grid | 232 px upcoming list | 80 px status bar**.
+  is **568 px month grid | 232 px upcoming list | 80 px footer**.
+- The grid is a **5-week rolling window** — today is anchored in row 3,
+  cells span −2 weeks back to +2 weeks forward. A `month_offset` int
+  global lets the prev/today/next buttons shift the window by 4-week steps.
+- The footer has **4 rows** at y = STATUS_Y + (8, 30, 52, 70):
+  1. Updated time + past/today/upcoming counts
+  2. Next event (start, in Xd, title) — red if today
+  3. WiFi + IP + uptime on the left, `${device_name} v${sw_version}` right
+  4. People line: `Label: zone (NN km/h)` for each of the 4 slots
 - Red (`id(col_red)`) is for accents only: header strip, today circle,
-  event dots, date labels in the sidebar. Everything else `id(col_black)` on
-  the default white background.
+  event dots, sidebar date labels, day-1 month label. Everything else
+  `id(col_black)` on the default white background.
 - Time uses `time.sntp` with a POSIX TZ string (currently
   `CET-1CEST,M3.5.0,M10.5.0/3`) for automatic DST.
 - The ESP32 never talks to Google directly — it only talks to Home
   Assistant over the encrypted native API.
+
+## Local `preview_page` external component
+
+- Lives in [esphome/components/preview_page/preview_page.h](../esphome/components/preview_page/preview_page.h).
+- Adds `GET /preview` (and `/dash`) handlers to the built-in `web_server`.
+  Returns a single self-contained HTML page that draws a JS-rendered SVG
+  mirror of the e-paper layout and an info card with live device stats.
+- Receives pointers / refs to event globals + text_sensors via setters
+  called from the `on_boot` lambda. Add new fields by extending the
+  setters/private fields in the .h, then wiring them in `on_boot`.
+- Uses ESPHome's `AsyncWebServerRequest::url_to(buf)` API — do **not**
+  re-introduce the deprecated `request->url()` getter (removed in
+  ESPHome 2026.9).
+- `js_escape()` helper inside the file handles inlining strings into the
+  embedded `<script>` block.
 
 ## Deployment
 
