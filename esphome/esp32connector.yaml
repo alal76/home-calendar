@@ -1,0 +1,1111 @@
+# ════════════════════════════════════════════════════════════════
+#  esp32connector.yaml — Home Calendar (ESPHome rewrite)
+#  Replaces the Arduino firmware in src/* for the existing
+#  `esp32connector` device managed by Home Assistant.
+#
+#  HARDWARE
+#    nanoESP32-C6 + Waveshare 7.5" e-Paper HAT (B), 800×480 BWR
+#    Pins  : MOSI=GPIO7  CLK=GPIO6  CS=GPIO5  DC=GPIO4  RST=GPIO3  BUSY=GPIO2
+#
+#  DATA SOURCE
+#    Home Assistant native API (no external server).
+#    HA's Google Calendar integration produces calendar entities; a
+#    template sensor (see esphome/README.md) calls `calendar.get_events`
+#    on a 5-min trigger and exposes the JSON list as an attribute on
+#      sensor.calendar_events_json   (attribute: events)
+#    This device subscribes to that attribute via the native API.
+#
+#  DEPLOY
+#    See esphome/README.md  (upload via ESPHome dashboard → Install OTA)
+# ════════════════════════════════════════════════════════════════
+
+substitutions:
+  device_name: esp32connector
+  friendly_name: Home Calendar
+  # Home Calendar firmware version. Bump with every published change
+  # so HA and the e-paper footer both show what is actually running.
+  sw_version: "1.1.0"
+  # HA template sensor that exposes the calendar events JSON as the
+  # `events` attribute. Set this up in HA per esphome/README.md.
+  ha_events_entity: "sensor.calendar_events_json"
+  ha_events_attribute: "events"
+  # HA script the local Refresh button will call to force a re-fetch.
+  ha_refresh_script: "script.refresh_home_calendar"
+  # POSIX TZ string — adjust for your location
+  tz: "CET-1CEST,M3.5.0,M10.5.0/3"
+
+  # ── People tracked on the footer ──
+  # state = zone name when in a known zone ("home", "work", …) or
+  # "not_home". The matching *_speed sensors come from the HA
+  # Companion App and are off by default — enable "Speed" under
+  # Companion App → Manage Sensors on the phone to populate them.
+  person_a_entity: "person.person_a"
+  person_a_label: "Person A"
+  speed_a_entity: "sensor.person_a_phone_speed"
+  person_b_entity: "person.person_b"
+  person_b_label: "Person B"
+  speed_b_entity: "sensor.person_b_phone_speed"
+  person_c_entity: "person.person_c"
+  person_c_label: "Person C"
+  speed_c_entity: "sensor.person_c_phone_speed"
+  person_d_entity: "person.person_d"
+  person_d_label: "Person D"
+  speed_d_entity: "sensor.person_d_phone_speed"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    # Make sure the status LED comes up running the Status effect even
+    # if HA later sends a turn_off / colour change (it's internal: true
+    # so HA can't actually do that, but this also covers cold-boot).
+    priority: -100
+    then:
+      - light.turn_on:
+          id: led_strip
+          effect: "Status"
+          brightness: 100%
+      # Hand the preview_page HTTP handler pointers to the live event
+      # globals so GET /preview can render the latest data.
+      - lambda: |-
+          id(preview_page1).set_count(&id(ev_count));
+          id(preview_page1).set_titles(&id(ev_titles));
+          id(preview_page1).set_starts(&id(ev_starts));
+          id(preview_page1).set_ends(&id(ev_ends));
+          id(preview_page1).set_all_day(&id(ev_all_day));
+          id(preview_page1).set_last_sync(&id(last_sync));
+          id(preview_page1).set_status(&id(last_status));
+          id(preview_page1).set_weather_state(id(weather_state));
+          id(preview_page1).set_weather_temp(id(weather_temp));
+          id(preview_page1).set_month_offset(&id(month_offset));
+          id(preview_page1).set_person_a(id(person_a_state));
+          id(preview_page1).set_person_b(id(person_b_state));
+          id(preview_page1).set_person_c(id(person_c_state));
+          id(preview_page1).set_person_d(id(person_d_state));
+          id(preview_page1).set_speed_a(id(speed_a_state));
+          id(preview_page1).set_speed_b(id(speed_b_state));
+          id(preview_page1).set_speed_c(id(speed_c_state));
+          id(preview_page1).set_speed_d(id(speed_d_state));
+          id(preview_page1).set_person_labels("${person_a_label}", "${person_b_label}",
+                                              "${person_c_label}", "${person_d_label}");
+          id(preview_page1).set_sw_version("${sw_version}");
+
+# Local external component that adds GET /preview to the web server.
+# See esphome/components/preview_page/ for the implementation.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [preview_page]
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  framework:
+    type: esp-idf            # Arduino framework on C6 is still unstable in ESPHome
+
+logger:
+  level: INFO
+
+# ── Keep your existing api / ota / wifi values when you merge ──
+api:
+  encryption:
+    key: !secret api_encryption_key
+  # Drive the status-LED state machine from real API client presence.
+  on_client_connected:
+    - lambda: 'id(led_api_up) = true;'
+  on_client_disconnected:
+    - lambda: 'id(led_api_up) = false;'
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:                                # fallback hotspot if home WiFi fails
+    ssid: "${device_name} Setup"
+  on_connect:
+    - lambda: 'id(led_wifi_up) = true;'
+  on_disconnect:
+    - lambda: |-
+        id(led_wifi_up) = false;
+        // Losing WiFi implies API is also gone.
+        id(led_api_up) = false;
+
+captive_portal:
+
+# ────────────────────────────────────────────────────────────────
+#  Local web UI — http://<device-ip>/ shows every entity, log stream,
+#  and lets you click "Refresh Calendar". `local: true` embeds the JS
+#  in firmware so it works without an internet connection.
+# ────────────────────────────────────────────────────────────────
+web_server:
+  version: 3
+  port: 80
+  local: true
+  include_internal: false      # hide the status LED, wifi_info etc.
+
+# Mirrors the e-paper layout at http://<device-ip>/preview.
+# Reads live event globals at request time (see on_boot lambda above
+# that wires the pointers in).
+preview_page:
+  id: preview_page1
+
+# Pull in the JSON util so the calendar text_sensor's lambda can call
+# json::parse_json (not auto-loaded by text_sensor on its own).
+json:
+
+# ────────────────────────────────────────────────────────────────
+#  Status LED — onboard WS2812 on GPIO8 (nanoESP32-C6).
+#  Drives a single addressable_lambda effect that picks colour +
+#  pattern from globals set by wifi / api / calendar hooks.
+#  Patterns:
+#    white   3 fast flashes  new calendar data just received
+#    blue    1 Hz breathe    WiFi disconnected
+#    red     200 ms / 60 s   HA API client disconnected
+#    yellow  4 s breathe     no calendar push for >15 min (stale)
+#    magenta 3 s breathe     booting / no time or no data yet
+#    green   8 s soft breathe everything good
+# ────────────────────────────────────────────────────────────────
+light:
+  - platform: esp32_rmt_led_strip
+    id: led_strip
+    internal: true            # not exposed/controllable from HA
+    rgb_order: GRB
+    pin: GPIO8
+    num_leds: 1
+    chipset: ws2812
+    default_transition_length: 0s
+    restore_mode: ALWAYS_ON
+    effects:
+      - addressable_lambda:
+          name: "Status"
+          update_interval: 50ms
+          lambda: |-
+            const uint32_t now_ms = millis();
+            const bool wifi_up = id(led_wifi_up);
+            const bool api_up  = id(led_api_up);
+            const uint32_t last_up = id(led_last_update_ms);
+            const uint32_t flash_until = id(led_flash_until_ms);
+            const bool time_ok = id(my_time).now().is_valid();
+            // "have_data" = we have received at least one push (even an
+            // empty event list counts). Empty calendar is a legit OK state.
+            const bool have_data = last_up != 0;
+            const bool stale = have_data &&
+                               (now_ms - last_up) > 15UL * 60UL * 1000UL;
+
+            int s;
+            if (flash_until > now_ms)        s = 5;  // white flashes
+            else if (!wifi_up)               s = 4;  // blue breathe
+            else if (!api_up)                s = 3;  // red 1/min
+            else if (stale)                  s = 2;  // yellow breathe
+            else if (!time_ok || !have_data) s = 1;  // magenta breathe
+            else                             s = 0;  // green breathe
+
+            // Triangle wave 0..max..0 over `period`.
+            auto breathe = [&](uint32_t period, uint8_t mx) -> uint8_t {
+              uint32_t p = now_ms % period;
+              uint32_t half = period / 2;
+              uint32_t v = p < half ? p : (period - p);
+              return (uint8_t)((v * mx) / half);
+            };
+            // Short pulse: ON for `on_ms` at start of each `period`.
+            auto pulse = [&](uint32_t period, uint32_t on_ms, uint8_t lvl) -> uint8_t {
+              return (now_ms % period) < on_ms ? lvl : 0;
+            };
+
+            uint8_t r = 0, g = 0, b = 0;
+            switch (s) {
+              case 5: {                                  // white flashes
+                uint8_t v = ((now_ms / 150) % 2) ? 200 : 0;
+                r = g = b = v; break;
+              }
+              case 4: { b = breathe(1000, 70); break; }  // blue
+              case 3: { r = pulse(60000, 200, 200); break; }  // red flash/min
+              case 2: { uint8_t v = breathe(4000, 50); r = v; g = v; break; }  // yellow
+              case 1: { uint8_t v = breathe(3000, 60); r = v; b = v; break; }  // magenta
+              default:{ g = breathe(8000, 25); break; }  // gentle green
+            }
+            it[0] = Color(r, g, b);
+
+# ────────────────────────────────────────────────────────────────
+#  SPI bus shared by the e-paper
+# ────────────────────────────────────────────────────────────────
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+
+# ────────────────────────────────────────────────────────────────
+#  Fonts (Roboto, fetched from Google Fonts at compile time)
+# ────────────────────────────────────────────────────────────────
+font:
+  - file: "gfonts://Roboto@700"
+    id: font_header
+    size: 28
+    bpp: 1
+  - file: "gfonts://Roboto@700"
+    id: font_label
+    size: 18
+    bpp: 1
+  - file: "gfonts://Roboto"
+    id: font_body
+    size: 12
+    bpp: 1
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 10
+    bpp: 1
+
+# ────────────────────────────────────────────────────────────────
+#  Colours (BWR — red is the third colour)
+# ────────────────────────────────────────────────────────────────
+color:
+  - id: col_red
+    red: 100%
+    green: 0%
+    blue: 0%
+  - id: col_black
+    red: 0%
+    green: 0%
+    blue: 0%
+  - id: col_white
+    red: 100%
+    green: 100%
+    blue: 100%
+
+# ────────────────────────────────────────────────────────────────
+#  Globals — storage for the parsed calendar payload
+# ────────────────────────────────────────────────────────────────
+globals:
+  - id: ev_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: ev_titles
+    type: std::array<std::string, 96>
+    restore_value: no
+  - id: ev_starts          # ISO-8601 e.g. "2025-01-15T10:30:00+00:00"
+    type: std::array<std::string, 96>
+    restore_value: no
+  - id: ev_ends            # ISO-8601; for all-day this is *exclusive* end
+    type: std::array<std::string, 96>
+    restore_value: no
+  - id: ev_all_day
+    type: std::array<bool, 96>
+    restore_value: no
+  - id: last_sync
+    type: std::string
+    restore_value: no
+    initial_value: '"never"'
+  - id: last_status
+    type: std::string
+    restore_value: no
+    initial_value: '"booting"'
+
+  # Calendar viewport offset in months (0 = current month).
+  # Toggled by GPIO10/11 physical buttons + HA buttons + /preview icons.
+  - id: month_offset
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # ── status-LED state machine inputs (set by hooks below) ──
+  - id: led_wifi_up
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: led_api_up
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: led_last_update_ms     # millis() of last calendar push (0 = never)
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: led_flash_until_ms     # while > millis(): white "update" flash
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
+# ────────────────────────────────────────────────────────────────
+#  Time (SNTP) + automatic DST via POSIX TZ string
+# ────────────────────────────────────────────────────────────────
+time:
+  - platform: sntp
+    id: my_time
+    timezone: ${tz}
+    servers:
+      - pool.ntp.org
+      - time.cloudflare.com
+
+# ────────────────────────────────────────────────────────────────
+#  Text sensors
+#    1) wifi_info  → status bar
+#    2) homeassistant → calendar events JSON pushed by HA's
+#       template sensor (see esphome/README.md)
+# ────────────────────────────────────────────────────────────────
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: wifi_ip
+    ssid:
+      id: wifi_ssid
+
+  # Static firmware version — exposed to HA as a diagnostic so the
+  # device card shows what is actually running.
+  - platform: template
+    name: "Home Calendar Version"
+    id: sw_version_sensor
+    entity_category: diagnostic
+    icon: "mdi:tag"
+    lambda: 'return {"${sw_version}"};'
+    update_interval: never
+
+  # ── Weather subscription (HA Met.no built-in, no API key needed) ──
+  - platform: homeassistant
+    id: weather_state
+    entity_id: weather.forecast_home
+  - platform: homeassistant
+    id: weather_temp
+    entity_id: weather.forecast_home
+    attribute: temperature
+
+  # ── People location + speed (Companion App). Speed sensors are
+  # ── disabled by default; the device tolerates "unavailable".
+  - platform: homeassistant
+    id: person_a_state
+    entity_id: ${person_a_entity}
+  - platform: homeassistant
+    id: person_b_state
+    entity_id: ${person_b_entity}
+  - platform: homeassistant
+    id: person_c_state
+    entity_id: ${person_c_entity}
+  - platform: homeassistant
+    id: person_d_state
+    entity_id: ${person_d_entity}
+  - platform: homeassistant
+    id: speed_a_state
+    entity_id: ${speed_a_entity}
+  - platform: homeassistant
+    id: speed_b_state
+    entity_id: ${speed_b_entity}
+  - platform: homeassistant
+    id: speed_c_state
+    entity_id: ${speed_c_entity}
+  - platform: homeassistant
+    id: speed_d_state
+    entity_id: ${speed_d_entity}
+
+  - platform: homeassistant
+    id: calendar_events_json
+    entity_id: ${ha_events_entity}
+    attribute: ${ha_events_attribute}
+    on_value:
+      then:
+        - lambda: |-
+            // x is the attribute value rendered to a JSON string by HA.
+            // HA wraps the events list as {"events": [...]} so parse_json
+            // (which only accepts a JsonObject root) can dig in.
+            bool ok = json::parse_json(x, [](JsonObject root) -> bool {
+              if (!root["events"].is<JsonArray>()) return false;
+              JsonArray arr = root["events"].as<JsonArray>();
+              int n = 0;
+              for (JsonObject e : arr) {
+                if (n >= 96) break;
+                // HA `calendar.get_events` event fields:
+                //   summary, start, end ("YYYY-MM-DDTHH:MM:SS+HH:MM" or
+                //   all-day "YYYY-MM-DD"). For all-day events HA returns
+                //   the iCal-style EXCLUSIVE end date (start + 1 day for
+                //   single-day, start + N for multi-day spans).
+                std::string s = std::string(e["start"] | "");
+                std::string en = std::string(e["end"] | "");
+                id(ev_titles)[n]  = std::string(e["summary"] | "");
+                id(ev_starts)[n]  = s;
+                id(ev_ends)[n]    = en;
+                // All-day events have a 10-char date string with no 'T'.
+                id(ev_all_day)[n] = (s.size() == 10);
+                n++;
+              }
+              id(ev_count) = n;
+              return true;
+            });
+            id(last_status) = ok ? "ok" : "parse err";
+            if (ok) {
+              char hm[8];
+              time_t t = id(my_time).now().timestamp;
+              struct tm tinfo;
+              localtime_r(&t, &tinfo);
+              strftime(hm, sizeof(hm), "%H:%M", &tinfo);
+              id(last_sync) = std::string(hm);
+              ESP_LOGI("calendar", "%d events parsed from HA", id(ev_count));
+              // Status LED: mark fresh data + trigger 1.5 s of white flashes.
+              uint32_t now_ms = millis();
+              id(led_last_update_ms) = now_ms;
+              id(led_flash_until_ms) = now_ms + 1500;
+              // Publish next-5 events to the local web UI as text_sensors.
+              int n = id(ev_count);
+              id(cal_event_count).publish_state((float) n);
+              auto fmt = [&](int i) -> std::string {
+                if (i >= n) return std::string("—");
+                const std::string &s = id(ev_starts)[i];
+                std::string out;
+                if (s.size() >= 10) {
+                  std::string md = s.substr(5, 5);
+                  for (auto &c : md) if (c == '-') c = '/';
+                  out = md;
+                }
+                if (!id(ev_all_day)[i] && s.size() >= 16) {
+                  out += " " + s.substr(11, 5);
+                } else if (id(ev_all_day)[i]) {
+                  out += " all-day";
+                }
+                out += "  " + id(ev_titles)[i];
+                if (out.size() > 90) { out.resize(89); out += "."; }
+                return out;
+              };
+              id(cal_next_1).publish_state(fmt(0));
+              id(cal_next_2).publish_state(fmt(1));
+              id(cal_next_3).publish_state(fmt(2));
+              id(cal_next_4).publish_state(fmt(3));
+              id(cal_next_5).publish_state(fmt(4));
+              id(cal_last_sync).publish_state(id(last_sync));
+            }
+        - component.update: cal_display
+
+  # ── Template text_sensors surfaced in the local web UI ──
+  - platform: template
+    name: "Next Event 1"
+    id: cal_next_1
+    icon: mdi:calendar-clock
+  - platform: template
+    name: "Next Event 2"
+    id: cal_next_2
+    icon: mdi:calendar
+  - platform: template
+    name: "Next Event 3"
+    id: cal_next_3
+    icon: mdi:calendar
+  - platform: template
+    name: "Next Event 4"
+    id: cal_next_4
+    icon: mdi:calendar
+  - platform: template
+    name: "Next Event 5"
+    id: cal_next_5
+    icon: mdi:calendar
+  - platform: template
+    name: "Last Sync"
+    id: cal_last_sync
+    icon: mdi:clock-check-outline
+
+# ────────────────────────────────────────────────────────────────
+#  Numeric sensors — also visible in the local web UI
+# ────────────────────────────────────────────────────────────────
+sensor:
+  - platform: template
+    name: "Event Count"
+    id: cal_event_count
+    icon: mdi:calendar-multiple
+    accuracy_decimals: 0
+    update_interval: never     # pushed from the parse lambda above
+
+  # ── footer telemetry (used by the display lambda + preview page) ──
+  - platform: wifi_signal
+    id: wifi_rssi
+    name: "WiFi RSSI"
+    update_interval: 60s
+  - platform: uptime
+    id: device_uptime
+    name: "Uptime"
+    update_interval: 60s
+
+# ────────────────────────────────────────────────────────────────
+#  Manual refresh — exposed to HA as button.refresh_calendar.
+#  When pressed it asks HA to re-run the template-sensor refresh
+#  script, which in turn updates ${ha_events_entity}, which the
+#  text_sensor above subscribes to.
+# ────────────────────────────────────────────────────────────────
+button:
+  - platform: template
+    name: "Refresh Calendar"
+    id: btn_refresh
+    on_press:
+      then:
+        - homeassistant.action:
+            action: script.turn_on
+            data:
+              entity_id: ${ha_refresh_script}
+
+  # ── month navigation (HA-exposed + invoked by physical buttons) ──
+  - platform: template
+    name: "Prev Month"
+    id: btn_prev_month
+    on_press:
+      then:
+        - lambda: |-
+            id(month_offset) -= 1;
+            if (id(month_offset) < -3) id(month_offset) = -3;
+        - component.update: cal_display
+
+  - platform: template
+    name: "Next Month"
+    id: btn_next_month
+    on_press:
+      then:
+        - lambda: |-
+            id(month_offset) += 1;
+            if (id(month_offset) > 3) id(month_offset) = 3;
+        - component.update: cal_display
+
+  - platform: template
+    name: "Reset Month"
+    id: btn_reset_month
+    on_press:
+      then:
+        - lambda: 'id(month_offset) = 0;'
+        - component.update: cal_display
+
+# ────────────────────────────────────────────────────────────────
+#  Physical buttons (wired to GND through a 10k pull-up to 3V3)
+#    GPIO10 → Prev month
+#    GPIO11 → Next month
+#    GPIO0  → Reset to current month (also the BOOT button — held
+#             at reset = entering download mode, but a normal press
+#             after boot is just a runtime input)
+# ────────────────────────────────────────────────────────────────
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO10
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Prev Month Switch"
+    id: sw_prev_month
+    internal: true
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - button.press: btn_prev_month
+
+  - platform: gpio
+    pin:
+      number: GPIO11
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Next Month Switch"
+    id: sw_next_month
+    internal: true
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - button.press: btn_next_month
+
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Reset Month Switch"
+    id: sw_reset_month
+    internal: true
+    filters:
+      - delayed_on: 50ms
+    on_press:
+      then:
+        - button.press: btn_reset_month
+
+# ────────────────────────────────────────────────────────────────
+#  7.5" BWR display + full layout lambda
+# ────────────────────────────────────────────────────────────────
+display:
+  - platform: waveshare_epaper
+    id: cal_display
+    model: 7.50in-bv2          # 7.5" V2 BWR (HAT B). If your board is V3, change to 7.50in-bv3
+    cs_pin: GPIO5
+    dc_pin: GPIO4
+    reset_pin: GPIO3
+    busy_pin: GPIO2
+    rotation: 0
+    update_interval: never     # driven by component.update from the script
+    lambda: |-
+      // ─────────────────────────────────────────────────────────
+      //  Calendar layout: 568 grid | 232 sidebar | 80 footer
+      //  Grid: 5-week rolling window. start = Monday of (today's
+      //        week − 2). Today is always in row 2; the window
+      //        always shows ≥14 days back and ≥14 days forward.
+      //        Month boundaries appear inline (labelled on day 1).
+      //  Nav:  month_offset shifts the window by 4 weeks per step.
+      //  Sidebar: TODAY | COMING UP (up to 10 events).
+      //  Footer:  3 rows — summary / next event / device info.
+      // ─────────────────────────────────────────────────────────
+      const int W = 800, H = 480;
+      const int CAL_W = 568, EVT_X = 568, EVT_W = 232;
+      const int HDR_H = 50, GRID_TOP = 78, STATUS_Y = 400;
+      const int NUM_ROWS = 5;            // 5 weeks × 7 days = 35 cells
+      const int NUM_CELLS = NUM_ROWS * 7;
+
+      // ─── time gate ───
+      auto now = id(my_time).now();
+      if (!now.is_valid()) {
+        it.printf(W/2, H/2, id(font_header), id(col_red),
+                  TextAlign::CENTER, "Syncing time...");
+        return;
+      }
+      time_t t_now = now.timestamp;
+      struct tm tm_now;
+      localtime_r(&t_now, &tm_now);
+      char today_iso[11];
+      strftime(today_iso, sizeof(today_iso), "%Y-%m-%d", &tm_now);
+      const std::string today_str(today_iso);
+
+      // ─── rolling-window start: Monday of (anchor week − 2) ───
+      // anchor = today shifted by month_offset × 28 days (≈ months).
+      int mo_off = id(month_offset);
+      struct tm tm_anchor = tm_now;
+      tm_anchor.tm_mday += mo_off * 28;
+      tm_anchor.tm_hour = 12;
+      mktime(&tm_anchor);
+      int anchor_dow = (tm_anchor.tm_wday + 6) % 7;  // Mon=0 … Sun=6
+      struct tm tm_start = tm_anchor;
+      tm_start.tm_mday -= anchor_dow + 14;
+      tm_start.tm_hour = 12;
+      time_t t_start = mktime(&tm_start);
+
+      // Map a (Y,M,D) to a cell index (0..34) in the window, else −1.
+      auto date_to_cell = [&](int y, int m, int d) -> int {
+        struct tm te = {};
+        te.tm_year = y - 1900; te.tm_mon = m - 1; te.tm_mday = d;
+        te.tm_hour = 12;
+        time_t tt = mktime(&te);
+        long days = (long)((tt - t_start + 43200) / 86400);
+        if (days < 0 || days >= NUM_CELLS) return -1;
+        return (int) days;
+      };
+
+      // Today's cell index (always valid when mo_off == 0).
+      int today_cell = date_to_cell(tm_now.tm_year + 1900,
+                                    tm_now.tm_mon + 1,
+                                    tm_now.tm_mday);
+
+      // Header label: show month range spanned by the window,
+      // collapsing to a single month when the start & end share one.
+      struct tm tm_end = tm_start;
+      tm_end.tm_mday += NUM_CELLS - 1;
+      mktime(&tm_end);
+      char month_buf[48];
+      {
+        char m1[20], m2[20];
+        strftime(m1, sizeof(m1), "%b %Y", &tm_start);
+        strftime(m2, sizeof(m2), "%b %Y", &tm_end);
+        if (tm_start.tm_mon == tm_end.tm_mon &&
+            tm_start.tm_year == tm_end.tm_year) {
+          strftime(month_buf, sizeof(month_buf), "%B %Y", &tm_start);
+        } else if (tm_start.tm_year == tm_end.tm_year) {
+          char b1[8], b2[20];
+          strftime(b1, sizeof(b1), "%b", &tm_start);
+          strftime(b2, sizeof(b2), "%b %Y", &tm_end);
+          snprintf(month_buf, sizeof(month_buf), "%s – %s", b1, b2);
+        } else {
+          snprintf(month_buf, sizeof(month_buf), "%s – %s", m1, m2);
+        }
+        if (mo_off != 0) {
+          char tmp[56];
+          snprintf(tmp, sizeof(tmp), "%s  (%+dmo)", month_buf, mo_off);
+          snprintf(month_buf, sizeof(month_buf), "%s", tmp);
+        }
+      }
+
+      // helper: ISO "2026-07-11" → "Sat 11 Jul"
+      auto fmt_date = [](const std::string &s) -> std::string {
+        if (s.size() < 10) return s;
+        struct tm t = {};
+        t.tm_year = atoi(s.substr(0,4).c_str()) - 1900;
+        t.tm_mon  = atoi(s.substr(5,2).c_str()) - 1;
+        t.tm_mday = atoi(s.substr(8,2).c_str());
+        t.tm_hour = 12;
+        mktime(&t);
+        char b[16];
+        strftime(b, sizeof(b), "%a %d %b", &t);
+        return std::string(b);
+      };
+
+      // bucket events by date category (lexicographic compare works on ISO)
+      std::vector<int> past, today_ev, upcoming;
+      for (int i = 0; i < id(ev_count); i++) {
+        const std::string &s = id(ev_starts)[i];
+        if (s.size() < 10) continue;
+        std::string d = s.substr(0,10);
+        if (d < today_str) past.push_back(i);
+        else if (d == today_str) today_ev.push_back(i);
+        else upcoming.push_back(i);
+      }
+
+      // ─── RED header strips ───
+      it.filled_rectangle(0, 0, CAL_W, HDR_H, id(col_red));
+      it.printf(16, 10, id(font_header), id(col_white),
+                TextAlign::TOP_LEFT, "%s", month_buf);
+      it.filled_rectangle(EVT_X, 0, EVT_W, HDR_H, id(col_red));
+      it.printf(EVT_X + 12, 6, id(font_label), id(col_white),
+                TextAlign::TOP_LEFT, "Calendar");
+
+      // Weather line in the sidebar header (HA Met.no). e.g. "23°C · Partly cloudy"
+      {
+        std::string wline;
+        if (id(weather_temp).has_state()) {
+          char buf[16];
+          float t = atof(id(weather_temp).state.c_str());
+          snprintf(buf, sizeof(buf), "%.0f°C", t);
+          wline = buf;
+        }
+        if (id(weather_state).has_state()) {
+          std::string s = id(weather_state).state;  // e.g. "partlycloudy"
+          // Map HA weather state slug → human-readable label.
+          std::string nice = s;
+          if (s == "clear-night")          nice = "Clear night";
+          else if (s == "cloudy")          nice = "Cloudy";
+          else if (s == "exceptional")     nice = "Severe";
+          else if (s == "fog")             nice = "Fog";
+          else if (s == "hail")            nice = "Hail";
+          else if (s == "lightning")       nice = "Thunder";
+          else if (s == "lightning-rainy") nice = "Thunderstorm";
+          else if (s == "partlycloudy")    nice = "Partly cloudy";
+          else if (s == "pouring")         nice = "Pouring";
+          else if (s == "rainy")           nice = "Rain";
+          else if (s == "snowy")           nice = "Snow";
+          else if (s == "snowy-rainy")     nice = "Sleet";
+          else if (s == "sunny")           nice = "Sunny";
+          else if (s == "windy")           nice = "Windy";
+          else if (s == "windy-variant")   nice = "Windy";
+          if (!wline.empty()) wline += " · ";
+          wline += nice;
+        }
+        if (!wline.empty()) {
+          it.printf(EVT_X + 12, 28, id(font_small), id(col_white),
+                    TextAlign::TOP_LEFT, "%s", wline.c_str());
+        }
+      }
+
+      it.line(CAL_W, 0, CAL_W, STATUS_Y, id(col_black));
+
+      // ─── day-of-week labels (weekend in red) ───
+      const char *days[] = {"Mo","Tu","We","Th","Fr","Sa","Su"};
+      int colW = CAL_W / 7;
+      for (int i = 0; i < 7; i++) {
+        auto c = (i >= 5) ? id(col_red) : id(col_black);
+        it.printf(i * colW + colW/2, 56, id(font_body), c,
+                  TextAlign::TOP_CENTER, "%s", days[i]);
+      }
+      it.line(0, 74, CAL_W, 74, id(col_black));
+
+      // ─── 5-week rolling grid ───
+      int rowH = (STATUS_Y - GRID_TOP) / NUM_ROWS;
+      int cell_x[NUM_CELLS] = {0}, cell_y[NUM_CELLS] = {0};
+
+      // Pass 1: cell rectangles + day numbers + today highlight +
+      //         month label on the 1st of any month inside the window.
+      for (int cell = 0; cell < NUM_CELLS; cell++) {
+        int row = cell / 7;
+        int col = cell % 7;
+        int x = col * colW;
+        int y = GRID_TOP + row * rowH;
+        cell_x[cell] = x; cell_y[cell] = y;
+
+        // walk start-date forward by `cell` days
+        struct tm td = tm_start;
+        td.tm_mday += cell;
+        td.tm_hour = 12;
+        mktime(&td);
+
+        it.rectangle(x, y, colW, rowH, id(col_black));
+
+        bool isToday = (cell == today_cell);
+        auto num_color = id(col_black);
+        if (isToday) {
+          it.filled_circle(x + colW/2, y + 18, 15, id(col_red));
+          num_color = id(col_white);
+        }
+        it.printf(x + colW/2, y + 6, id(font_label), num_color,
+                  TextAlign::TOP_CENTER, "%d", td.tm_mday);
+
+        // Month-break marker: on the 1st of any month, label the
+        // month in red at the cell's top-right corner.
+        if (td.tm_mday == 1) {
+          char mb[8];
+          strftime(mb, sizeof(mb), "%b", &td);
+          it.printf(x + colW - 4, y + 6, id(font_small), id(col_red),
+                    TextAlign::TOP_RIGHT, "%s", mb);
+        }
+      }
+
+      // Pass 2: multi-day event bars across cells (stacked up to 2/cell).
+      int bar_slots[NUM_ROWS][7] = {{0}};
+      const int BAR_BASE = 24, BAR_H = 11, BAR_GAP = 1, MAX_BARS = 2;
+      for (int i = 0; i < id(ev_count); i++) {
+        const std::string &s  = id(ev_starts)[i];
+        const std::string &eo = id(ev_ends)[i];
+        if (s.size() < 10 || eo.size() < 10) continue;
+        int sy = atoi(s.substr(0,4).c_str());
+        int sm = atoi(s.substr(5,2).c_str());
+        int sd = atoi(s.substr(8,2).c_str());
+        int ey = atoi(eo.substr(0,4).c_str());
+        int em = atoi(eo.substr(5,2).c_str());
+        int ed = atoi(eo.substr(8,2).c_str());
+        if (id(ev_all_day)[i]) {
+          // HA gives iCal-style EXCLUSIVE end date — back it up one day.
+          struct tm te = {};
+          te.tm_year = ey - 1900; te.tm_mon = em - 1; te.tm_mday = ed - 1;
+          te.tm_hour = 12;
+          mktime(&te);
+          ey = te.tm_year + 1900; em = te.tm_mon + 1; ed = te.tm_mday;
+        }
+        // Convert start/end to cell-day-offsets relative to window.
+        struct tm tsd = {}, ted = {};
+        tsd.tm_year = sy - 1900; tsd.tm_mon = sm - 1; tsd.tm_mday = sd; tsd.tm_hour = 12;
+        ted.tm_year = ey - 1900; ted.tm_mon = em - 1; ted.tm_mday = ed; ted.tm_hour = 12;
+        long s_day = (long)((mktime(&tsd) - t_start + 43200) / 86400);
+        long e_day = (long)((mktime(&ted) - t_start + 43200) / 86400);
+        if (s_day == e_day) continue;           // single-day → dot pass
+        if (e_day < 0 || s_day >= NUM_CELLS) continue;
+        long first = std::max<long>(s_day, 0);
+        long last  = std::min<long>(e_day, NUM_CELLS - 1);
+        bool first_segment = (s_day >= 0);
+        long d = first;
+        while (d <= last) {
+          int r = d / 7, c0 = d % 7;
+          long max_in_row = std::min<long>(last, d + 6 - c0);
+          int width_cells = (int)(max_in_row - d + 1);
+          int slot = bar_slots[r][c0];
+          if (slot < MAX_BARS) {
+            int x1 = c0 * colW + 2;
+            int x2 = (c0 + width_cells - 1) * colW + colW - 2;
+            int y_bar = GRID_TOP + r * rowH + BAR_BASE + slot * (BAR_H + BAR_GAP);
+            it.filled_rectangle(x1, y_bar, x2 - x1, BAR_H, id(col_red));
+            if (first_segment) {
+              std::string t = id(ev_titles)[i];
+              int max_chars = (x2 - x1 - 4) / 6;
+              if (max_chars < 1) max_chars = 1;
+              if ((int) t.size() > max_chars) {
+                t.resize(std::max(1, max_chars - 1));
+                t += ".";
+              }
+              it.printf(x1 + 2, y_bar + 1, id(font_small), id(col_black),
+                        TextAlign::TOP_LEFT, "%s", t.c_str());
+            }
+            for (int cc = c0; cc < c0 + width_cells; cc++) bar_slots[r][cc]++;
+          }
+          first_segment = false;
+          d = max_in_row + 1;
+        }
+      }
+
+      // Pass 3: single-day event dots + first-event label.
+      // Iterate per cell; gather events that start on that date and
+      // aren't multi-day (those drawn as bars above).
+      for (int cell = 0; cell < NUM_CELLS; cell++) {
+        int x = cell_x[cell], y = cell_y[cell];
+        int dots = 0;
+        std::string label = "";
+        // Compute this cell's calendar date.
+        struct tm td = tm_start;
+        td.tm_mday += cell;
+        td.tm_hour = 12;
+        mktime(&td);
+        int cy = td.tm_year + 1900;
+        int cm = td.tm_mon + 1;
+        int cd = td.tm_mday;
+        char cell_iso[11];
+        snprintf(cell_iso, sizeof(cell_iso), "%04d-%02d-%02d", cy, cm, cd);
+        const std::string cell_iso_str(cell_iso);
+
+        for (int i = 0; i < id(ev_count) && dots < 3; i++) {
+          const std::string &s  = id(ev_starts)[i];
+          const std::string &eo = id(ev_ends)[i];
+          if (s.size() < 10) continue;
+          if (s.substr(0, 10) != cell_iso_str) continue;
+          // Skip multi-day (bars).
+          if (eo.size() >= 10) {
+            int eey = atoi(eo.substr(0,4).c_str());
+            int eem = atoi(eo.substr(5,2).c_str());
+            int eed = atoi(eo.substr(8,2).c_str());
+            if (id(ev_all_day)[i]) eed--;
+            if (!(cy == eey && cm == eem && cd == eed)) continue;
+          }
+          it.filled_circle(x + 8 + dots * 12, y + rowH - 9, 4,
+                           (cell_iso_str < today_str) ? id(col_black) : id(col_red));
+          if (dots == 0) label = id(ev_titles)[i];
+          dots++;
+        }
+        if (!label.empty()) {
+          if (label.size() > 9) label.resize(9);
+          it.printf(x + 3, y + rowH - 22, id(font_small), id(col_black),
+                    TextAlign::TOP_LEFT, "%s", label.c_str());
+        }
+      }
+
+      // ─── sidebar: TODAY + COMING UP (up to 10 events total) ───
+      int py = HDR_H + 6;
+      const int px = EVT_X + 8;
+      const int row_h = 26;
+      const int max_y = STATUS_Y - 6;
+      const int MAX_SIDEBAR = 10;
+      int shown_total = 0;
+
+      auto draw_event = [&](int idx, esphome::Color title_color,
+                            esphome::Color date_color) -> bool {
+        if (py + row_h > max_y) return false;
+        if (shown_total >= MAX_SIDEBAR) return false;
+        const std::string &s = id(ev_starts)[idx];
+        std::string date_label = fmt_date(s);
+        if (!id(ev_all_day)[idx] && s.size() >= 16) {
+          date_label += " " + s.substr(11, 5);
+        } else if (id(ev_all_day)[idx]) {
+          date_label += " all-day";
+        }
+        it.printf(px, py, id(font_small), date_color,
+                  TextAlign::TOP_LEFT, "%s", date_label.c_str());
+        std::string t = id(ev_titles)[idx];
+        if (t.size() > 28) { t.resize(27); t += "."; }
+        it.printf(px, py + 11, id(font_small), title_color,
+                  TextAlign::TOP_LEFT, "%s", t.c_str());
+        py += row_h;
+        shown_total++;
+        return true;
+      };
+
+      auto draw_subhead = [&](const char *label, esphome::Color c) {
+        if (py + 14 > max_y) return;
+        it.printf(px, py, id(font_small), c,
+                  TextAlign::TOP_LEFT, "%s", label);
+        py += 14;
+      };
+
+      // TODAY
+      if (!today_ev.empty()) {
+        draw_subhead("TODAY", id(col_red));
+        for (int i : today_ev) {
+          if (!draw_event(i, id(col_black), id(col_red))) break;
+        }
+        py += 2;
+      }
+
+      // COMING UP — fill remaining slots up to MAX_SIDEBAR total
+      if (!upcoming.empty() && shown_total < MAX_SIDEBAR) {
+        draw_subhead("COMING UP", id(col_black));
+        for (int i : upcoming) {
+          if (!draw_event(i, id(col_black), id(col_red))) break;
+        }
+      } else if (today_ev.empty() && upcoming.empty()) {
+        it.printf(px, py + 6, id(font_body), id(col_black),
+                  TextAlign::TOP_LEFT, "No events");
+      }
+
+      // ─── footer (3 rows) ───
+      it.line(0, STATUS_Y, W, STATUS_Y, id(col_black));
+
+      // Row 1: Updated · counts
+      it.printf(8, STATUS_Y + 8, id(font_body), id(col_black),
+                TextAlign::TOP_LEFT,
+                "Updated %s   ·   %d past · %d today · %d upcoming",
+                id(last_sync).c_str(),
+                (int) past.size(), (int) today_ev.size(),
+                (int) upcoming.size());
+
+      // Row 2: Next event line
+      if (!today_ev.empty()) {
+        const std::string &s = id(ev_starts)[today_ev[0]];
+        std::string t = id(ev_titles)[today_ev[0]];
+        if (t.size() > 50) { t.resize(49); t += "."; }
+        const char *when = (!id(ev_all_day)[today_ev[0]] && s.size() >= 16)
+                            ? s.substr(11,5).c_str() : "all-day";
+        it.printf(8, STATUS_Y + 30, id(font_body), id(col_red),
+                  TextAlign::TOP_LEFT, "Next today: %s  —  %s", when, t.c_str());
+      } else if (!upcoming.empty()) {
+        const std::string &s = id(ev_starts)[upcoming[0]];
+        std::string t = id(ev_titles)[upcoming[0]];
+        if (t.size() > 40) { t.resize(39); t += "."; }
+        struct tm tu = {};
+        tu.tm_year = atoi(s.substr(0,4).c_str()) - 1900;
+        tu.tm_mon  = atoi(s.substr(5,2).c_str()) - 1;
+        tu.tm_mday = atoi(s.substr(8,2).c_str());
+        tu.tm_hour = 12;
+        time_t tt = mktime(&tu);
+        int days_to = (int) ((tt - t_now + 43200) / 86400);
+        it.printf(8, STATUS_Y + 30, id(font_body), id(col_red),
+                  TextAlign::TOP_LEFT, "Next: %s · in %dd  —  %s",
+                  fmt_date(s).c_str(), days_to, t.c_str());
+      } else {
+        it.printf(8, STATUS_Y + 30, id(font_body), id(col_black),
+                  TextAlign::TOP_LEFT, "Next: (no upcoming events)");
+      }
+
+      // Row 3: device info — WiFi / IP / Uptime / device + version
+      float up_h = id(device_uptime).has_state() ? id(device_uptime).state / 3600.0f : 0;
+      float rssi = id(wifi_rssi).has_state() ? id(wifi_rssi).state : 0;
+      it.printf(8, STATUS_Y + 52, id(font_small), id(col_black),
+                TextAlign::TOP_LEFT,
+                "WiFi %s (%.0f dBm)  ·  IP %s  ·  Up %.1f h",
+                id(wifi_ssid).state.c_str(),
+                rssi,
+                id(wifi_ip).state.c_str(),
+                up_h);
+      it.printf(W - 8, STATUS_Y + 52, id(font_small), id(col_black),
+                TextAlign::TOP_RIGHT, "${device_name} v${sw_version}");
+
+      // Row 4: People — zone + (optional) speed from HA Companion App.
+      // Format one person: "Label: zone (NN km/h)" — speed dropped
+      // when sensor is unavailable or < 1 m/s (≈3.6 km/h, GPS noise).
+      auto fmt_person = [](const std::string &label,
+                           text_sensor::TextSensor *st,
+                           text_sensor::TextSensor *sp) -> std::string {
+        std::string out = label;
+        out += ": ";
+        if (st && st->has_state() && !st->state.empty() &&
+            st->state != "unavailable" && st->state != "unknown") {
+          std::string s = st->state;
+          // HA uses "not_home" — cheaper to read as "away" on a 800px display.
+          if (s == "not_home") s = "away";
+          out += s;
+        } else {
+          out += "?";
+        }
+        if (sp && sp->has_state() && !sp->state.empty() &&
+            sp->state != "unavailable" && sp->state != "unknown") {
+          float mps = atof(sp->state.c_str());
+          if (mps >= 1.0f) {     // > 3.6 km/h → moving
+            char b[16];
+            snprintf(b, sizeof(b), " (%.0f km/h)", mps * 3.6f);
+            out += b;
+          }
+        }
+        return out;
+      };
+      {
+        std::string row4 = fmt_person("${person_a_label}",
+                                      id(person_a_state),
+                                      id(speed_a_state));
+        row4 += "  ·  ";
+        row4 += fmt_person("${person_b_label}",
+                           id(person_b_state),
+                           id(speed_b_state));
+        row4 += "  ·  ";
+        row4 += fmt_person("${person_c_label}",
+                           id(person_c_state),
+                           id(speed_c_state));
+        row4 += "  ·  ";
+        row4 += fmt_person("${person_d_label}",
+                           id(person_d_state),
+                           id(speed_d_state));
+        it.printf(8, STATUS_Y + 68, id(font_small), id(col_black),
+                  TextAlign::TOP_LEFT, "%s", row4.c_str());
+      }

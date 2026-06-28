@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "esphome.esphome-vscode",
+    "redhat.vscode-yaml",
+    "github.copilot",
+    "github.copilot-chat",
+    "usernamehw.errorlens",
+    "eamodio.gitlens"
+  ]
+}

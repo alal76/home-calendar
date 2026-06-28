@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Home Calendar — display preview</title>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                Roboto, Helvetica, Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 16px;
+            gap: 10px;
+        }
+
+        .meta {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+        }
+
+        .meta b {
+            color: #eee;
+        }
+
+        .meta code {
+            background: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #9cf;
+        }
+
+        .frame {
+            width: 800px;
+            height: 480px;
+            background: #ffffff;
+            box-shadow: 0 6px 40px rgba(0, 0, 0, 0.6);
+            border: 1px solid #444;
+            flex-shrink: 0;
+        }
+
+        svg {
+            display: block;
+        }
+
+        table.evdump {
+            border-collapse: collapse;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        table.evdump td,
+        table.evdump th {
+            border: 1px solid #333;
+            padding: 2px 8px;
+        }
+
+        table.evdump th {
+            background: #222;
+            color: #ddd;
+        }
+
+        details {
+            color: #888;
+            width: 800px;
+        }
+
+        summary {
+            cursor: pointer;
+            padding: 6px 0;
+        }
+
+        @media (max-width: 840px) {
+
+            .frame,
+            details {
+                transform-origin: top center;
+            }
+
+            body {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="meta">
+        Home Calendar — display preview · generated <b>__GENERATED_AT__</b>
+        · source <b>__SOURCE__</b> · state <b>__STATE_COUNT__</b> events
+    </div>
+
+    <div class="frame">
+        <svg id="display" width="800" height="480" viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg"
+            font-family="Roboto, Helvetica, Arial, sans-serif">
+        </svg>
+    </div>
+
+    <div class="meta">Re-run <code>./scripts/preview-display.sh</code> to refresh.</div>
+
+    <details>
+        <summary>Raw events fed to the renderer (click to expand)</summary>
+        <table class="evdump" id="dumptable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>start</th>
+                    <th>summary</th>
+                    <th>calendar</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </details>
+
+    <script>
+        // Embedded by preview-display.sh
+        const EVENTS = __EVENTS_JSON__;
+
+        // ── replicates display lambda in esphome/esp32connector.yaml ──
+        const W = 800, H = 480, CAL_W = 568, EVT_X = 568, EVT_W = 232;
+        const HDR_H = 50, GRID_TOP = 78, STATUS_Y = 400;
+        const RED = "#d70000", BLK = "#111", WHT = "#ffffff";
+
+        const svg = document.getElementById("display");
+        const NS = "http://www.w3.org/2000/svg";
+
+        function el(tag, attrs, text) {
+            const e = document.createElementNS(NS, tag);
+            for (const k in attrs) e.setAttribute(k, attrs[k]);
+            if (text != null) e.textContent = text;
+            svg.appendChild(e);
+            return e;
+        }
+        const rect = (x, y, w, h, fill, stroke) =>
+            el("rect", { x, y, width: w, height: h, fill, stroke: stroke || "none" });
+        const line = (x1, y1, x2, y2, c) =>
+            el("line", { x1, y1, x2, y2, stroke: c || BLK, "stroke-width": 1 });
+        const circ = (cx, cy, r, fill) => el("circle", { cx, cy, r, fill });
+        function txt(x, y, size, fill, anchor, weight, t) {
+            el("text", {
+                x, y, fill,
+                "font-size": size,
+                "text-anchor": anchor || "start",
+                "dominant-baseline": "hanging",
+                "font-weight": weight || "normal",
+            }, t);
+        }
+
+        const now = new Date();
+        const month = now.getMonth();          // 0-11
+        const year = now.getFullYear();
+        const today = now.getDate();
+        const monthName = now.toLocaleString("en-US", { month: "long" });
+
+        // red header strips
+        rect(0, 0, CAL_W, HDR_H, RED);
+        txt(16, 10, 28, WHT, "start", "700", `${monthName}  ${year}`);
+        rect(EVT_X, 0, EVT_W, HDR_H, RED);
+        txt(EVT_X + 12, 14, 18, WHT, "start", "700", "Upcoming");
+        line(CAL_W, 0, CAL_W, STATUS_Y);
+
+        // day-of-week labels (Mo..Su)
+        const days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+        const colW = CAL_W / 7;
+        for (let i = 0; i < 7; i++) {
+            txt(i * colW + colW / 2, 56, 12, BLK, "middle", "normal", days[i]);
+        }
+        line(0, 74, CAL_W, 74);
+
+        // month grid
+        const first = new Date(year, month, 1);
+        const startCol = (first.getDay() + 6) % 7;            // Monday=0
+        const dim = new Date(year, month + 1, 0).getDate();
+        const rowH = (STATUS_Y - GRID_TOP) / 6;
+
+        let col = startCol, row = 0;
+        for (let d = 1; d <= dim; d++) {
+            const x = col * colW, y = GRID_TOP + row * rowH;
+            rect(x, y, colW, rowH, "none", BLK);
+
+            if (d === today) circ(x + colW / 2, y + 18, 15, RED);
+            txt(x + colW / 2, y + 6, 18, d === today ? WHT : BLK,
+                "middle", "700", String(d));
+
+            let dots = 0, label = "";
+            for (const ev of EVENTS) {
+                if (dots >= 3) break;
+                const s = (ev.start || "").toString();
+                if (s.length < 10) continue;
+                const em = parseInt(s.substring(5, 7), 10);
+                const ed = parseInt(s.substring(8, 10), 10);
+                if (em === month + 1 && ed === d) {
+                    circ(x + 8 + dots * 12, y + rowH - 9, 4, RED);
+                    if (dots === 0) label = ev.summary || "";
+                    dots++;
+                }
+            }
+            if (label) {
+                const lbl = label.length > 9 ? label.substring(0, 9) : label;
+                txt(x + 3, y + rowH - 22, 10, BLK, "start", "normal", lbl);
+            }
+            if (++col > 6) { col = 0; row++; }
+        }
+
+        // upcoming sidebar
+        let py = HDR_H + 8, shown = 0;
+        const px = EVT_X + 8;
+        for (const ev of EVENTS) {
+            if (shown >= 10) break;
+            const s = (ev.start || "").toString();
+            if (s.length < 10) continue;
+            const allDay = s.length === 10;
+            const dl = s.substring(5, 10).replace("-", "/");
+            txt(px, py, 12, RED, "start", "normal", dl);
+            if (!allDay && s.length >= 16) {
+                txt(px + 52, py, 12, BLK, "start", "normal", s.substring(11, 16));
+            }
+            let t = ev.summary || "";
+            if (t.length > 22) t = t.substring(0, 21) + ".";
+            txt(px, py + 16, 12, BLK, "start", "normal", t);
+            py += 35;
+            line(EVT_X + 4, py - 2, EVT_X + EVT_W - 4, py - 2);
+            shown++;
+        }
+        if (shown === 0) {
+            txt(px, py + 6, 12, BLK, "start", "normal", "No upcoming events");
+        }
+
+        // status bar
+        line(0, STATUS_Y, W, STATUS_Y);
+        txt(8, STATUS_Y + 10, 12, BLK, "start", "normal",
+            "WiFi: your-ssid   Host: esp32connector.local");
+        txt(8, STATUS_Y + 34, 12, BLK, "start", "normal",
+            "Source: HA sensor.calendar_events_json (events)");
+        const hm = now.toTimeString().substring(0, 5);
+        txt(8, STATUS_Y + 58, 12, BLK, "start", "normal",
+            `Last sync: ${hm}   Status: ok   Events: ${EVENTS.length}`);
+        txt(W - 8, STATUS_Y + 58, 12, BLK, "end", "normal", "esp32connector");
+
+        // raw dump table for debugging which calendar events are present
+        const tbody = document.querySelector("#dumptable tbody");
+        EVENTS.forEach((ev, i) => {
+            const tr = document.createElement("tr");
+            for (const v of [i + 1, ev.start || "", ev.summary || "", ev.calendar || ""]) {
+                const td = document.createElement("td");
+                td.textContent = v;
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        });
+    </script>
+</body>
+
+</html>

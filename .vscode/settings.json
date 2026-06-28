@@ -1,0 +1,16 @@
+{
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/esphome/esphome-vscode/main/server/src/schema/esphome.json": [
+      "esphome/*.yaml"
+    ]
+  },
+  "files.associations": {
+    "esphome/*.yaml": "yaml"
+  },
+  "editor.formatOnSave": true,
+  "[yaml]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  }
+}
