@@ -6,7 +6,8 @@ Persistent context for the home-calendar project. Copilot reads
 ## Project
 
 A wall-mounted home calendar display:
-- **Device:** `esp32connector` at **esp32connector.local** — nanoESP32-C6 (MuseLab v1.0)
+- **Device:** `esp32connector` at **esp32connector.local** — ESP32-S3-DevKitC-1
+  (Heemol N16R8 module with antenna interface)
 - **Display:** Waveshare 7.5" e-Paper HAT (B) — BWR 800×480 (WS-13505)
 - **Firmware:** **ESPHome YAML** managed by Home Assistant at **your-home-assistant-host**
 - **Data source:** Home Assistant's built-in **Google Calendar** integration.
@@ -26,11 +27,16 @@ has been fully removed — do not suggest reintroducing it.
   (or `7.50in-bv3` for the newer V3 board).
 - BWR has **no partial refresh**. Every update is a full 15–20 s repaint —
   this is expected, never treat it as a bug.
-- **GPIO8** is the onboard RGB LED — never assign it as a GPIO.
-- **GPIO9** is the BOOT button — avoid using as general GPIO.
+- **GPIO0** is the BOOT strap button — avoid assigning as a normal GPIO unless intentional.
+- **GPIO20/21** are native USB D−/D+ — avoid assigning as general GPIO.
+- **GPIO43/44** are UART0 TX/RX (USB-serial path) — leave free for logging.
+- **GPIO48** is onboard RGB LED on most S3 DevKitC-1 boards.
 - Display VCC must be **3.3 V**, never 5 V.
 
-## Pin assignments (nanoESP32-C6)
+## Pin assignments (ESP32-S3-DevKitC-1)
+
+Wire by GPIO labels on the board silkscreen. Physical header numbering
+varies by vendor for S3 clones.
 
 | Function | GPIO |
 |----------|------|
@@ -41,14 +47,16 @@ has been fully removed — do not suggest reintroducing it.
 | EPD RST | 3 |
 | EPD BUSY | 2 |
 | Button | 0 |
-| I2S out (DAC) BCLK/LRC/DIN | 18/19/20 |
-| I2S in (mic) SCK/WS/SD | 21/22/23 |
+| I2S out (DAC) BCLK/LRC/DIN | 15/16/17 |
+| I2S in (mic) SCK/WS/SD | 18/45/14 |
 
 ## ESPHome conventions
 
 - The firmware lives in [esphome/esp32connector.yaml](../esphome/esp32connector.yaml).
-- ESP32-C6 requires `framework: type: esp-idf` in ESPHome (the Arduino
-  framework is still unstable on C6). Don't suggest `arduino`.
+- ESP32-S3 configuration in this project uses `framework: type: esp-idf`.
+  Don't suggest switching to `arduino` for this device.
+- `logger: hardware_uart: UART0` routes serial output to GPIO43/44 for the
+  USB UART port. `improv_serial:` is included for first-boot WiFi provisioning.
 - All tunable knobs go in `substitutions:` at the top of the yaml —
   including `sw_version`, the 4 person/speed entity pairs, weather entity,
   TZ, calendar sensor / refresh script entity ids.
@@ -93,9 +101,11 @@ has been fully removed — do not suggest reintroducing it.
 
 ## Deployment
 
-- Edit yaml in the ESPHome dashboard (HA → Settings → Add-ons → ESPHome).
-- Click **INSTALL → Wirelessly** — compiles in the addon, OTAs to esp32connector.local.
-- Don't suggest USB flashing, `esphome run`, `esphome compile` from the Mac,
+- **First flash**: connect USB-C to the board's UART port → ESPHome dashboard
+  → INSTALL → **Plug into this computer** → select the serial port.
+  `improv_serial` handles WiFi provisioning automatically on first boot.
+- **Subsequent flashes**: ESPHome dashboard → INSTALL → **Wirelessly** (OTA).
+- Don't suggest `esphome run`, `esphome compile` from the Mac,
   or anything PlatformIO/Arduino-related.
 
 ## When suggesting changes

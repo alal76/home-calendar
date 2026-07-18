@@ -1,7 +1,7 @@
-# Home Calendar — ESPHome on nanoESP32-C6
+# Home Calendar — ESPHome on ESP32-S3 DevKitC-1
 
 A wall-mounted Google Calendar display on a Waveshare 7.5" black/white/red
-e-ink panel, driven by a nanoESP32-C6 running **ESPHome** under Home
+e-ink panel, driven by an ESP32-S3 DevKitC-1 (Heemol N16R8) running **ESPHome** under Home
 Assistant. Home Assistant's built-in Google Calendar integration does the
 OAuth and event fetching; a template sensor pushes the events list to the
 device over the native API.
@@ -78,7 +78,7 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 | Calendar    | Home Assistant Google Calendar integration (OAuth + token refresh) |
 | Bridge      | HA template sensor `sensor.calendar_events_json` (5-min trigger) re-runs `calendar.get_events` (-7d to +90d window) and stashes the result in an `events` attribute |
 | Transport   | ESPHome native API (encrypted) — device subscribes to the sensor attribute |
-| Device      | nanoESP32-C6 + Waveshare 7.5" HAT (B), pins in [WIRING.md](WIRING.md) |
+| Device      | ESP32-S3 DevKitC-1 (Heemol N16R8) + Waveshare 7.5" HAT (B), pins in [WIRING.md](WIRING.md) |
 | Firmware    | ESPHome YAML + lambdas (see [esphome/esp32connector.yaml](esphome/esp32connector.yaml)) |
 | Web preview | Local `preview_page` external component exposes `GET /preview` + `/dash` on port 80 — JS-rendered SVG mirror of the e-paper layout |
 | Presence    | HA Companion App on each phone publishes `person.*` (and optionally `sensor.*_speed`); device subscribes and renders zone + speed |
@@ -117,10 +117,11 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 
 ## Wiring
 
-Full schematic: [docs/wiring-diagram.svg](docs/wiring-diagram.svg). Open it
-in a browser for a zoomable view.
+S3 display wiring: [docs/wiring-display-s3.svg](docs/wiring-display-s3.svg).
+Legacy C6 full wiring (kept for reference):
+[docs/wiring-diagram-c6.svg](docs/wiring-diagram-c6.svg).
 
-[![Wiring diagram](docs/wiring-diagram.svg)](docs/wiring-diagram.svg)
+[![S3 wiring diagram](docs/wiring-display-s3.svg)](docs/wiring-display-s3.svg)
 
 All connections are female-to-female 2.54 mm dupont jumpers, no soldering
 required. See [WIRING.md](WIRING.md) for the same data in plain tables and
@@ -128,7 +129,7 @@ the wire-colour convention used in the diagram.
 
 ### E-paper display (Waveshare 7.5" BWR HAT — required)
 
-| HAT pin | Signal | nanoESP32-C6 | Wire |
+| HAT pin | Signal | ESP32-S3 | Wire |
 |---------|--------|--------------|------|
 | VCC     | 3.3 V  | **3V3**      | red |
 | GND     | Ground | **GND**      | black |
@@ -143,42 +144,42 @@ the wire-colour convention used in the diagram.
 
 ### Manual refresh button (recommended)
 
-| Button | nanoESP32-C6 |
-|--------|--------------|
-| leg 1  | **GPIO0**    |
-| leg 2  | **GND**      |
+Use the on-board **BOOT** button (`GPIO0`) by default; no external wiring needed.
 
-Mapped to `button.refresh_calendar` in HA. Internal pull-up; no external resistor needed.
+Mapped to `button.refresh_calendar` in HA. Internal pull-up is already handled.
 
 ### Audio out — MAX98357A I²S DAC + 4–8 Ω speaker (optional)
 
-| DAC pin | nanoESP32-C6 | Wire |
+| DAC pin | ESP32-S3 | Wire |
 |---------|--------------|------|
 | VIN     | **3V3**      | red |
 | GND     | **GND**      | black |
-| BCLK    | **GPIO18**   | blue |
-| LRC     | **GPIO19**   | yellow |
-| DIN     | **GPIO20**   | orange |
+| BCLK    | **GPIO15**   | blue |
+| LRC     | **GPIO16**   | yellow |
+| DIN     | **GPIO17**   | orange |
 | SPK+/SPK− | speaker terminals | — |
 
 ### Microphone — INMP441 I²S MEMS (optional)
 
-| Mic pin | nanoESP32-C6 | Wire |
+| Mic pin | ESP32-S3 | Wire |
 |---------|--------------|------|
 | VDD     | **3V3**      | red |
 | GND     | **GND**      | black |
-| SCK     | **GPIO21**   | blue |
-| WS      | **GPIO22**   | yellow |
-| SD      | **GPIO23**   | orange |
+| SCK     | **GPIO18**   | blue |
+| WS      | **GPIO45**   | yellow |
+| SD      | **GPIO14**   | orange |
 | L/R     | **GND**      | black (tied to GND for left-channel) |
 
 ### Reserved / free pins
 
 | GPIO    | Status                                                |
 |---------|-------------------------------------------------------|
-| GPIO8   | **Reserved** — onboard WS2812B RGB status LED         |
-| GPIO9   | **Reserved** — BOOT button on the board               |
-| GPIO1, GPIO10–13, GPIO15, RX, TX | Free for future expansion |
+| GPIO0   | **Reserved** — BOOT strap button (on-board)           |
+| GPIO20  | **Reserved** — native USB D−                          |
+| GPIO21  | **Reserved** — native USB D+                          |
+| GPIO43/44 | **Reserved** — UART0 TX/RX (USB-serial / first-flash) |
+| GPIO48  | **Reserved** — onboard RGB status LED                 |
+| GPIO8, GPIO9, GPIO10-13, GPIO15-19, GPIO35-38, GPIO45-47 | Free for expansion |
 
 ### Power
 

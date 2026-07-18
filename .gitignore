@@ -19,3 +19,4 @@ secrets.yaml
 .env
 *.local
 
+.venv/

@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <!--
+       home-calendar wiring diagram — display only
+      ESP32-S3-DevKitC-1 (Heemol N16R8 style)
+        + Waveshare 7.5" e-Paper HAT (B) BWR 800x480 (WS-13505)
+       Board orientation matches the physical layout: USB-C ports at
+       the BOTTOM (near the BOOT/RST buttons). All 8 display wires go
+       to the LEFT rail. 3V3 is at the BOTTOM of the left rail (right
+       next to the USB-C ports); GND is at the TOP.
+  -->
+
+  <defs>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="750" fill="#f7f7f5"/>
+
+  <!-- TITLE / LEGEND -->
+  <text x="40" y="50" font-size="26" font-weight="700" fill="#111">home-calendar — display wiring</text>
+  <text x="40" y="76" font-size="14" fill="#555">
+    ESP32-S3-DevKitC-1 ↔ Waveshare 7.5" e-Paper HAT (B) · GPIO mapping reference for the 9 display wires
+  </text>
+  <text x="40" y="96" font-size="12" fill="#666">
+    Exact physical pin locations depend on board revision; follow the labeled pin map in WIRING.md.
+  </text>
+
+  <g transform="translate(720,40)" font-size="12" fill="#222">
+    <text x="0" y="0" font-weight="700" font-size="13" fill="#111">Wire colours</text>
+    <g transform="translate(0,14)">
+      <rect x="0"   y="0" width="24" height="8" fill="#d62828"/><text x="32"  y="8">3V3 / VCC</text>
+      <rect x="110" y="0" width="24" height="8" fill="#111"/>   <text x="142" y="8">GND</text>
+      <rect x="190" y="0" width="24" height="8" fill="#1e6fd9"/><text x="222" y="8">MOSI / DIN</text>
+      <rect x="320" y="0" width="24" height="8" fill="#e0c50a"/><text x="352" y="8">CLK</text>
+    </g>
+    <g transform="translate(0,34)">
+      <rect x="0"   y="0" width="24" height="8" fill="#e67e22"/><text x="32"  y="8">CS</text>
+      <rect x="80"  y="0" width="24" height="8" fill="#27ae60"/><text x="112" y="8">DC</text>
+      <rect x="150" y="0" width="24" height="8" fill="#8e44ad"/><text x="182" y="8">RST</text>
+      <rect x="220" y="0" width="24" height="8" fill="#ffffff" stroke="#333" stroke-width="0.75"/><text x="252" y="8">BUSY</text>
+      <rect x="290" y="0" width="24" height="8" fill="#8b4513"/><text x="322" y="8">PWR → GPIO1</text>
+    </g>
+  </g>
+
+  <!-- ================== WIRES ==================
+       Coordinate reference (after group translations):
+       Driver header pins (right edge x = 394, pin centres):
+         VCC y=369, GND y=379, DIN y=389, CLK y=399,
+         CS  y=409, DC  y=419, RST y=429, BUSY y=439, PWR y=449
+       ESP LEFT rail pins (outer edge x = 626, pin centres by rail
+       position i = 1..15, top-to-bottom):
+         1  GND         y=205
+         2  5V          y=229
+         3  GPIO3 RST   y=253
+         4  GPIO2 BUSY  y=277
+         5  GPIO11      y=301
+         6  GPIO10      y=325
+         7  GPIO8 LED   y=349
+         8  GPIO1       y=373
+         9  GPIO0       y=397
+         10 GPIO7 DIN   y=421
+         11 GPIO6 CLK   y=445
+         12 GPIO5 CS    y=469
+         13 GPIO4 DC    y=493
+         14 RST/EN      y=517
+         15 3V3         y=541
+  -->
+  <g fill="none" stroke-width="3" stroke-linecap="round">
+    <!-- VCC   driver(394,369) -> 3V3 bottom(626,541) -->
+    <path d="M394 369 C 490 369, 530 541, 626 541" stroke="#d62828"/>
+    <!-- GND   driver(394,379) -> GND top(626,205) -->
+    <path d="M394 379 C 490 379, 530 205, 626 205" stroke="#111"/>
+    <!-- DIN   driver(394,389) -> GPIO7(626,421) -->
+    <path d="M394 389 C 490 389, 530 421, 626 421" stroke="#1e6fd9"/>
+    <!-- CLK   driver(394,399) -> GPIO6(626,445) -->
+    <path d="M394 399 C 490 399, 530 445, 626 445" stroke="#e0c50a"/>
+    <!-- CS    driver(394,409) -> GPIO5(626,469) -->
+    <path d="M394 409 C 490 409, 530 469, 626 469" stroke="#e67e22"/>
+    <!-- DC    driver(394,419) -> GPIO4(626,493) -->
+    <path d="M394 419 C 490 419, 530 493, 626 493" stroke="#27ae60"/>
+    <!-- RST   driver(394,429) -> GPIO3(626,253) -->
+    <path d="M394 429 C 490 429, 530 253, 626 253" stroke="#8e44ad"/>
+    <!-- BUSY  driver(394,439) -> GPIO2(626,277) — white wire with dark halo so it stays visible on the light background -->
+    <path d="M394 439 C 490 439, 530 277, 626 277" stroke="#333" stroke-width="5"/>
+    <path d="M394 439 C 490 439, 530 277, 626 277" stroke="#ffffff"/>
+    <!-- PWR   driver(394,449) -> GPIO1(626,373) — held HIGH by ESPHome power_pin, LOW between refreshes -->
+    <path d="M394 449 C 490 449, 530 373, 626 373" stroke="#8b4513"/>
+  </g>
+
+  <!-- Wire colour labels — anchored at the ESP pin end of each wire
+       (no collisions since ESP pins are evenly stacked). Colour-matched
+       with a white halo so light strokes (yellow / white) stay legible. -->
+  <g font-size="11" font-weight="700" text-anchor="end"
+     paint-order="stroke" stroke="#f7f7f5" stroke-width="3" stroke-linejoin="round">
+    <text x="620" y="202" fill="#111">Black</text>
+    <text x="620" y="250" fill="#8e44ad">Purple</text>
+    <text x="620" y="274" fill="#555">White</text>
+    <text x="620" y="418" fill="#1e6fd9">Blue</text>
+    <text x="620" y="442" fill="#b8a008">Yellow</text>
+    <text x="620" y="466" fill="#e67e22">Orange</text>
+    <text x="620" y="490" fill="#27ae60">Green</text>
+    <text x="620" y="538" fill="#d62828">Red</text>
+    <text x="620" y="370" fill="#8b4513">Brown</text>
+  </g>
+
+  <!-- ================== Waveshare 7.5" display + driver (LEFT) ================== -->
+  <g transform="translate(80,140)">
+    <!-- Panel -->
+    <rect x="0" y="0" width="340" height="200" rx="6" fill="#e9e6dd" stroke="#9c9079" stroke-width="2" filter="url(#shadow)"/>
+    <text x="170" y="92" font-size="22" font-weight="700" fill="#333" text-anchor="middle">Waveshare 7.5"</text>
+    <text x="170" y="118" font-size="14" fill="#666" text-anchor="middle">e-Paper HAT (B) · BWR · 800×480</text>
+    <text x="170" y="140" font-size="12" fill="#888" text-anchor="middle">WS-13505 · model 7.50in-bv2</text>
+    <text x="170" y="184" font-size="11" fill="#c0392b" text-anchor="middle">⚠ VCC must be 3.3 V — never 5 V</text>
+
+    <!-- Driver / adapter board -->
+    <rect x="40" y="224" width="260" height="90" rx="6" fill="#1f5f3a" stroke="#0d3f20" stroke-width="2" filter="url(#shadow)"/>
+    <text x="170" y="248" font-size="13" font-weight="700" fill="#e6e6e6" text-anchor="middle">Driver board (HAT adapter)</text>
+    <text x="170" y="266" font-size="11" fill="#bfe6c8" text-anchor="middle">9-pin header (Rev 2.3) → ribbon to panel</text>
+
+    <!-- 9-pin header on RIGHT side of driver -->
+    <g class="pinlabels" font-size="11" fill="#e6e6e6">
+      <rect x="300" y="224" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="233" text-anchor="end">VCC</text>
+      <rect x="300" y="234" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="243" text-anchor="end">GND</text>
+      <rect x="300" y="244" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="253" text-anchor="end">DIN</text>
+      <rect x="300" y="254" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="263" text-anchor="end">CLK</text>
+      <rect x="300" y="264" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="273" text-anchor="end">CS</text>
+      <rect x="300" y="274" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="283" text-anchor="end">DC</text>
+      <rect x="300" y="284" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="293" text-anchor="end">RST</text>
+      <rect x="300" y="294" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="303" text-anchor="end">BUSY</text>
+      <rect x="300" y="304" width="14" height="10" fill="#0d3f20" stroke="#bfe6c8"/><text x="296" y="313" text-anchor="end">PWR</text>
+    </g>
+  </g>
+
+  <!-- ================== ESP32-S3-DevKitC-1 (RIGHT, USB-C at BOTTOM) ==================
+       Pin coordinates rel to translate(640,100):
+         LEFT rail (pin box rel x=-14..0)   y_top = 100 + (i-1)*24
+         RIGHT rail (pin box rel x=200..214) y_top = 100 + (i-1)*24
+       Board rect: 0,0,200,550 (bottom at rel y=550)
+  -->
+  <g transform="translate(640,100)">
+    <!-- Board body -->
+    <rect x="0" y="0" width="200" height="550" rx="10" ry="10"
+          fill="#1f3a5f" stroke="#0d203f" stroke-width="2" filter="url(#shadow)"/>
+
+    <!-- ESP32-S3 module (near top, opposite side from USB-C) -->
+    <rect x="46" y="30" width="108" height="60" rx="4" fill="#c5cbd3" stroke="#7f8c8d"/>
+    <text x="100" y="55" font-size="11" font-weight="700" fill="#222" text-anchor="middle">ESP32-S3-WROOM</text>
+    <text x="100" y="72" font-size="9"  fill="#555" text-anchor="middle">Wi-Fi + BLE 5</text>
+    <!-- Antenna hint -->
+    <path d="M100 90 Q 96 96 100 100 Q 104 96 100 90" fill="none" stroke="#7f8c8d" stroke-width="1.5"/>
+
+    <!-- Regulator / power-management area (decorative strip) -->
+    <rect x="60" y="450" width="80" height="16" rx="2" fill="#0d203f" stroke="#4a6a90"/>
+    <text x="100" y="462" font-size="8" fill="#a8b8cc" text-anchor="middle">LDO / power</text>
+
+    <!-- BOOT + RESET buttons + RGB LED (near USB-C) -->
+    <rect x="18"  y="476" width="14" height="12" rx="2" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="16"  y="485" font-size="9" fill="#e6e6e6" text-anchor="end">BOOT</text>
+    <rect x="168" y="476" width="14" height="12" rx="2" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="184" y="485" font-size="9" fill="#e6e6e6" text-anchor="start">RST</text>
+    <circle cx="100" cy="482" r="4" fill="#ff4d6d" stroke="#7a0e2c"/>
+
+    <!-- Two USB-C connectors at the BOTTOM -->
+    <rect x="24"  y="500" width="60" height="24" rx="4" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="54"  y="538" font-size="10" text-anchor="middle" fill="#555">USB-C · CH343</text>
+    <text x="54"  y="551" font-size="9"  text-anchor="middle" fill="#7a869a">(UART / flash)</text>
+    <rect x="116" y="500" width="60" height="24" rx="4" fill="#bdc3c7" stroke="#7f8c8d"/>
+    <text x="146" y="538" font-size="10" text-anchor="middle" fill="#555">USB-C · native USB</text>
+    <text x="146" y="551" font-size="9"  text-anchor="middle" fill="#7a869a">(native / power)</text>
+
+    <!-- ================== LEFT RAIL ==================
+         All 8 display wires attach here. Bolded pins are used by
+         the display; greyed-out pins are shown for context only.  -->
+    <g class="pinlabels" font-size="11" fill="#e6e6e6">
+      <!-- pos 1: GND -->
+      <rect x="-14" y="100" width="14" height="10" fill="#111" stroke="#444"/>
+      <text x="4" y="109" font-weight="700">GND</text>
+      <!-- pos 2: 5V -->
+      <rect x="-14" y="124" width="14" height="10" fill="#8a4a1f" stroke="#3f2410"/>
+      <text x="4" y="133" fill="#7a869a">5V (unused)</text>
+      <!-- pos 3: GPIO3 (RST) -->
+      <rect x="-14" y="148" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="157" font-weight="700">GPIO3  (RST)</text>
+      <!-- pos 4: GPIO2 (BUSY) -->
+      <rect x="-14" y="172" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="181" font-weight="700">GPIO2  (BUSY)</text>
+      <!-- pos 5: GPIO11 -->
+      <rect x="-14" y="196" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="4" y="205" fill="#7a869a">GPIO11</text>
+      <!-- pos 6: GPIO10 -->
+      <rect x="-14" y="220" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="4" y="229" fill="#7a869a">GPIO10</text>
+      <!-- pos 7: GPIO8 (LED) -->
+      <rect x="-14" y="244" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="4" y="253" fill="#7a869a">GPIO8 (LED)</text>
+      <!-- pos 8: GPIO1 -->
+      <rect x="-14" y="268" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="277" font-weight="700">GPIO1  (PWR)</text>
+      <!-- pos 9: GPIO0 -->
+      <rect x="-14" y="292" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="4" y="301" fill="#7a869a">GPIO0</text>
+      <!-- pos 10: GPIO7 (DIN) -->
+      <rect x="-14" y="316" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="325" font-weight="700">GPIO7  (DIN / MOSI)</text>
+      <!-- pos 11: GPIO6 (CLK) -->
+      <rect x="-14" y="340" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="349" font-weight="700">GPIO6  (CLK)</text>
+      <!-- pos 12: GPIO5 (CS) -->
+      <rect x="-14" y="364" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="373" font-weight="700">GPIO5  (CS)</text>
+      <!-- pos 13: GPIO4 (DC) -->
+      <rect x="-14" y="388" width="14" height="10" fill="#1f3a5f" stroke="#aab"/>
+      <text x="4" y="397" font-weight="700">GPIO4  (DC)</text>
+      <!-- pos 14: RST/EN -->
+      <rect x="-14" y="412" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="4" y="421" fill="#7a869a">RST (EN)</text>
+      <!-- pos 15: 3V3 -->
+      <rect x="-14" y="436" width="14" height="10" fill="#d62828" stroke="#7a0e0e"/>
+      <text x="4" y="445" font-weight="700">3V3</text>
+    </g>
+
+    <!-- ================== RIGHT RAIL (unused for display) ================== -->
+    <g class="pinlabels" font-size="11" fill="#7a869a">
+      <rect x="200" y="100" width="14" height="10" fill="#111" stroke="#444"/>
+      <text x="196" y="109" text-anchor="end">GND</text>
+      <rect x="200" y="124" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="133" text-anchor="end">GPIO12</text>
+      <rect x="200" y="148" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="157" text-anchor="end">GPIO13</text>
+      <rect x="200" y="172" width="14" height="10" fill="#111" stroke="#444"/>
+      <text x="196" y="181" text-anchor="end">GND</text>
+      <rect x="200" y="196" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="205" text-anchor="end">GPIO9 (BOOT)</text>
+      <rect x="200" y="220" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="229" text-anchor="end">GPIO18</text>
+      <rect x="200" y="244" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="253" text-anchor="end">GPIO19</text>
+      <rect x="200" y="268" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="277" text-anchor="end">GPIO20</text>
+      <rect x="200" y="292" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="301" text-anchor="end">GPIO21</text>
+      <rect x="200" y="316" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="325" text-anchor="end">GPIO22</text>
+      <rect x="200" y="340" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="349" text-anchor="end">GPIO23</text>
+      <rect x="200" y="364" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="373" text-anchor="end">GPIO15</text>
+      <rect x="200" y="388" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="397" text-anchor="end">RX (IO17)</text>
+      <rect x="200" y="412" width="14" height="10" fill="#1f3a5f" stroke="#556"/>
+      <text x="196" y="421" text-anchor="end">TX (IO16)</text>
+      <rect x="200" y="436" width="14" height="10" fill="#111" stroke="#444"/>
+      <text x="196" y="445" text-anchor="end">GND</text>
+    </g>
+  </g>
+
+  <!-- ================== FOOTER NOTES ================== -->
+  <g font-size="12" fill="#333">
+    <rect x="40" y="660" width="1120" height="72" rx="6" fill="#ffffff" stroke="#ddd"/>
+    <text x="56" y="684" font-weight="700">Notes:</text>
+    <text x="56" y="702">• Board orientation: hold the DevKitC-1 with the two USB-C ports at the bottom. 3V3 is the pin closest to the USB-C ports on the left rail; GND is at the opposite (top) end.</text>
+    <text x="56" y="720">• Power the board over USB. On S3 boards, avoid reusing GPIO19/20 for peripherals when using native USB.</text>
+  </g>
+
+</svg>

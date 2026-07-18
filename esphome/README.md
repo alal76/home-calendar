@@ -126,11 +126,36 @@ The first two (`wifi_ssid`, `wifi_password`) almost certainly already exist in
 your `/config/esphome/secrets.yaml`. The `api_encryption_key` needs to be the
 *existing* key for this device (not a new one) so HA recognises it.
 
-### 6. Compile + flash
+### 6a. First flash — USB cable (new device / blank board)
 
-Click **SAVE → INSTALL → Wirelessly**. ESPHome compiles inside the addon and
-OTAs the binary to esp32connector.local. First compile pulls fonts and esp-idf — a few
-minutes. Subsequent installs are fast.
+Use this path the **first time** this firmware is installed on a board, or
+whenever the device is not reachable over WiFi.
+
+1. Connect a USB-C cable to the board's **UART port** (the port that goes
+   through the on-board CH343 USB-serial chip — check your board silkscreen;
+   on the Heemol N16R8 this is the port closest to the 5V/GND end of the board).
+2. In the ESPHome dashboard, open `esp32connector` → click **INSTALL**.
+3. Choose **"Plug into this computer"** (not Wirelessly).
+4. Select the serial port that appears (`/dev/tty.usbserial-*` on macOS,
+   `COMx` on Windows).
+5. ESPHome compiles and flashes the firmware over the cable (~10–30 s).
+6. On first boot, `improv_serial` advertises over the serial connection.
+   The ESPHome dashboard detects this and prompts for your WiFi credentials.
+   Alternatively the captive-portal AP (`esp32connector Setup`) is available
+   if improv handshake is skipped.
+
+> Keep the serial LOGS panel open during first boot to confirm the device
+> connects to WiFi, syncs time, and receives the first calendar push.
+
+### 6b. Subsequent flashes — OTA (device already on WiFi)
+
+Once the device is online, all future firmware updates go wireless:
+
+1. Edit the yaml in the ESPHome dashboard.
+2. Click **SAVE → INSTALL → Wirelessly**.
+3. ESPHome compiles inside the addon and OTAs to esp32connector.local.
+   First compile of a fresh toolchain version pulls fonts and esp-idf
+   (~5 min). Subsequent installs are fast (~1–2 min).
 
 ### 7. Verify
 
@@ -193,9 +218,9 @@ display update without waiting for the 5-minute interval.
    the picture will be garbled — change the model to `7.50in-bv3` and rebuild.
 2. **No partial refresh.** Each update is a full 15–20 s repaint. Don't
    shorten the HA template-sensor cadence below ~2 min or you'll burn the panel.
-3. **ESP32-C6 framework.** The yaml uses `esp-idf` (not Arduino) because
-   ESPHome's Arduino-on-C6 support is still rough. `waveshare_epaper` and the
-   homeassistant text_sensor both work fine under esp-idf.
+3. **ESP32-S3 framework.** The yaml uses `esp-idf` (not Arduino) for stable,
+  predictable behavior with `waveshare_epaper`, native API, and local web
+  handlers on S3 boards.
 4. **Fonts download at compile time.** First build needs internet access in
    the ESPHome addon container to pull Roboto from Google Fonts.
 5. **No HA = no calendar.** Because the device subscribes to a HA sensor

@@ -4,7 +4,7 @@
 #  `esp32connector` device managed by Home Assistant.
 #
 #  HARDWARE
-#    nanoESP32-C6 + Waveshare 7.5" e-Paper HAT (B), 800×480 BWR
+#    ESP32-S3-DevKitC-1 (Heemol N16R8) + Waveshare 7.5" e-Paper HAT (B), 800×480 BWR
 #    Pins  : MOSI=GPIO7  CLK=GPIO6  CS=GPIO5  DC=GPIO4  RST=GPIO3  BUSY=GPIO2
 #
 #  DATA SOURCE
@@ -16,15 +16,21 @@
 #    This device subscribes to that attribute via the native API.
 #
 #  DEPLOY
-#    See esphome/README.md  (upload via ESPHome dashboard → Install OTA)
+#    First flash  : USB-C cable to the UART port → ESPHome dashboard
+#                   → INSTALL → "Plug into this computer"
+#    Subsequent    : ESPHome dashboard → INSTALL → "Wirelessly" (OTA)
+#    See esphome/README.md for full steps.
 # ════════════════════════════════════════════════════════════════
 
 substitutions:
   device_name: esp32connector
   friendly_name: Home Calendar
+  board_type: esp32-s3-devkitc-1
+  board_variant: esp32s3
+  status_led_pin: GPIO48
   # Home Calendar firmware version. Bump with every published change
   # so HA and the e-paper footer both show what is actually running.
-  sw_version: "1.1.0"
+  sw_version: "1.2.0"
   # HA template sensor that exposes the calendar events JSON as the
   # `events` attribute. Set this up in HA per esphome/README.md.
   ha_events_entity: "sensor.calendar_events_json"
@@ -99,13 +105,19 @@ external_components:
     components: [preview_page]
 
 esp32:
-  board: esp32-c6-devkitc-1
-  variant: esp32c6
+  board: ${board_type}
+  variant: ${board_variant}
   framework:
-    type: esp-idf            # Arduino framework on C6 is still unstable in ESPHome
+    type: esp-idf # Keep esp-idf for consistent ESPHome behavior on S3
 
+# ────────────────────────────────────────────────────────────────
+#  Logger — routes to UART0 (GPIO43 TX / GPIO44 RX) which is
+#  bridged to the UART USB-C port via the on-board CH343 chip.
+#  Use the UART USB-C port for first-flash serial monitoring.
+# ────────────────────────────────────────────────────────────────
 logger:
-  level: INFO
+  level: DEBUG
+  hardware_uart: UART0
 
 # ── Keep your existing api / ota / wifi values when you merge ──
 api:
@@ -113,9 +125,9 @@ api:
     key: !secret api_encryption_key
   # Drive the status-LED state machine from real API client presence.
   on_client_connected:
-    - lambda: 'id(led_api_up) = true;'
+    - lambda: "id(led_api_up) = true;"
   on_client_disconnected:
-    - lambda: 'id(led_api_up) = false;'
+    - lambda: "id(led_api_up) = false;"
 
 ota:
   - platform: esphome
@@ -124,10 +136,10 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  ap:                                # fallback hotspot if home WiFi fails
+  ap: # fallback hotspot if home WiFi fails
     ssid: "${device_name} Setup"
   on_connect:
-    - lambda: 'id(led_wifi_up) = true;'
+    - lambda: "id(led_wifi_up) = true;"
   on_disconnect:
     - lambda: |-
         id(led_wifi_up) = false;
@@ -135,6 +147,13 @@ wifi:
         id(led_api_up) = false;
 
 captive_portal:
+
+# ────────────────────────────────────────────────────────────────
+#  Improv Serial — enables WiFi provisioning from the ESPHome
+#  dashboard when connected via the UART USB-C port on first boot.
+#  Has no effect once WiFi is configured; safe to leave in.
+# ────────────────────────────────────────────────────────────────
+improv_serial:
 
 # ────────────────────────────────────────────────────────────────
 #  Local web UI — http://<device-ip>/ shows every entity, log stream,
@@ -145,7 +164,7 @@ web_server:
   version: 3
   port: 80
   local: true
-  include_internal: false      # hide the status LED, wifi_info etc.
+  include_internal: false # hide the status LED, wifi_info etc.
 
 # Mirrors the e-paper layout at http://<device-ip>/preview.
 # Reads live event globals at request time (see on_boot lambda above
@@ -158,7 +177,8 @@ preview_page:
 json:
 
 # ────────────────────────────────────────────────────────────────
-#  Status LED — onboard WS2812 on GPIO8 (nanoESP32-C6).
+#  Status LED — onboard RGB LED is GPIO48 on most ESP32-S3 DevKitC-1 boards.
+#  If your exact board revision differs, override substitutions.status_led_pin.
 #  Drives a single addressable_lambda effect that picks colour +
 #  pattern from globals set by wifi / api / calendar hooks.
 #  Patterns:
@@ -172,9 +192,9 @@ json:
 light:
   - platform: esp32_rmt_led_strip
     id: led_strip
-    internal: true            # not exposed/controllable from HA
+    internal: true # not exposed/controllable from HA
     rgb_order: GRB
-    pin: GPIO8
+    pin: ${status_led_pin}
     num_leds: 1
     chipset: ws2812
     default_transition_length: 0s
@@ -282,14 +302,14 @@ globals:
   - id: ev_count
     type: int
     restore_value: no
-    initial_value: '0'
+    initial_value: "0"
   - id: ev_titles
     type: std::array<std::string, 96>
     restore_value: no
-  - id: ev_starts          # ISO-8601 e.g. "2025-01-15T10:30:00+00:00"
+  - id: ev_starts # ISO-8601 e.g. "2025-01-15T10:30:00+00:00"
     type: std::array<std::string, 96>
     restore_value: no
-  - id: ev_ends            # ISO-8601; for all-day this is *exclusive* end
+  - id: ev_ends # ISO-8601; for all-day this is *exclusive* end
     type: std::array<std::string, 96>
     restore_value: no
   - id: ev_all_day
@@ -309,25 +329,25 @@ globals:
   - id: month_offset
     type: int
     restore_value: no
-    initial_value: '0'
+    initial_value: "0"
 
   # ── status-LED state machine inputs (set by hooks below) ──
   - id: led_wifi_up
     type: bool
     restore_value: no
-    initial_value: 'false'
+    initial_value: "false"
   - id: led_api_up
     type: bool
     restore_value: no
-    initial_value: 'false'
-  - id: led_last_update_ms     # millis() of last calendar push (0 = never)
+    initial_value: "false"
+  - id: led_last_update_ms # millis() of last calendar push (0 = never)
     type: uint32_t
     restore_value: no
-    initial_value: '0'
-  - id: led_flash_until_ms     # while > millis(): white "update" flash
+    initial_value: "0"
+  - id: led_flash_until_ms # while > millis(): white "update" flash
     type: uint32_t
     restore_value: no
-    initial_value: '0'
+    initial_value: "0"
 
 # ────────────────────────────────────────────────────────────────
 #  Time (SNTP) + automatic DST via POSIX TZ string
@@ -510,7 +530,7 @@ sensor:
     id: cal_event_count
     icon: mdi:calendar-multiple
     accuracy_decimals: 0
-    update_interval: never     # pushed from the parse lambda above
+    update_interval: never # pushed from the parse lambda above
 
   # ── footer telemetry (used by the display lambda + preview page) ──
   - platform: wifi_signal
@@ -539,6 +559,11 @@ button:
             data:
               entity_id: ${ha_refresh_script}
 
+  # ── remote reboot (visible in HA + local web UI) ──
+  - platform: restart
+    name: "Restart Device"
+    id: btn_restart
+
   # ── month navigation (HA-exposed + invoked by physical buttons) ──
   - platform: template
     name: "Prev Month"
@@ -565,16 +590,17 @@ button:
     id: btn_reset_month
     on_press:
       then:
-        - lambda: 'id(month_offset) = 0;'
+        - lambda: "id(month_offset) = 0;"
         - component.update: cal_display
 
 # ────────────────────────────────────────────────────────────────
-#  Physical buttons (wired to GND through a 10k pull-up to 3V3)
-#    GPIO10 → Prev month
-#    GPIO11 → Next month
-#    GPIO0  → Reset to current month (also the BOOT button — held
-#             at reset = entering download mode, but a normal press
-#             after boot is just a runtime input)
+#  Physical buttons — use ESPHome's internal pull-up; no external
+#  resistors needed. Wire one leg to the GPIO, the other to GND.
+#    GPIO10 → Prev month  (left rail)
+#    GPIO11 → Next month  (left rail)
+#    GPIO0  → Reset to current month — this is the on-board BOOT
+#             button. Hold at power-on = download mode; a brief
+#             press after boot is a normal runtime input.
 # ────────────────────────────────────────────────────────────────
 binary_sensor:
   - platform: gpio
@@ -628,16 +654,29 @@ binary_sensor:
 # ────────────────────────────────────────────────────────────────
 #  7.5" BWR display + full layout lambda
 # ────────────────────────────────────────────────────────────────
+switch:
+  # HAT Rev 2.3 has a PWR pin that gates panel power via an on-board
+  # MOSFET. Drive it HIGH at boot (restore_mode ALWAYS_ON forces the
+  # state regardless of what flash last held) so the display always
+  # comes up powered. Marked internal so it doesn't clutter HA — flip
+  # to `internal: false` if you want a manual power-cycle toggle.
+  - platform: gpio
+    pin: GPIO1
+    id: display_power
+    name: "Display Power"
+    restore_mode: ALWAYS_ON
+    internal: true
+
 display:
   - platform: waveshare_epaper
     id: cal_display
-    model: 7.50in-bv2          # 7.5" V2 BWR (HAT B). If your board is V3, change to 7.50in-bv3
+    model: 7.50in-bv3-bwr # 7.5" V3 BWR (HAT B). Use 7.50in-bv2 for older V2 hardware (B/W only)
     cs_pin: GPIO5
     dc_pin: GPIO4
     reset_pin: GPIO3
     busy_pin: GPIO2
     rotation: 0
-    update_interval: never     # driven by component.update from the script
+    update_interval: never # driven by component.update from the script
     lambda: |-
       // ─────────────────────────────────────────────────────────
       //  Calendar layout: 568 grid | 232 sidebar | 80 footer
