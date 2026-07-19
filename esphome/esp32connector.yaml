@@ -4,8 +4,8 @@
 #  `esp32connector` device managed by Home Assistant.
 #
 #  HARDWARE
-#    ESP32-S3-DevKitC-1 (Heemol N16R8) + Waveshare 7.5" e-Paper HAT (B), 800×480 BWR
-#    Pins  : MOSI=GPIO7  CLK=GPIO6  CS=GPIO5  DC=GPIO4  RST=GPIO3  BUSY=GPIO2
+#    ESP32-S3-DevKitC-1 (Heemol N16R8) + Waveshare 7.5" e-Paper HAT (B) V3, 800×480 BWR
+#    Pins  : MOSI=GPIO7  CLK=GPIO6  CS=GPIO5  DC=GPIO4  RST=GPIO3  BUSY=GPIO2  PWR=GPIO1
 #
 #  DATA SOURCE
 #    Home Assistant native API (no external server).

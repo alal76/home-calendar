@@ -1,10 +1,12 @@
 // ────────────────────────────────────────────────────────────────
 //  preview_page.h
-//  Registers GET /preview on the existing ESPHome web server.
-//  Returns an HTML+SVG dashboard that mirrors the e-paper layout,
-//  using the live event globals (ev_count / ev_titles / ev_starts /
-//  ev_ends / ev_all_day / last_sync / last_status) populated by the
-//  calendar text_sensor in esp32connector.yaml.
+//  Registers GET /, /preview, and /dash on the existing ESPHome web
+//  server (port 80). / and /preview return the same HTML+SVG
+//  dashboard that mirrors the e-paper layout, using the live event
+//  globals (ev_count / ev_titles / ev_starts / ev_ends / ev_all_day /
+//  last_sync / last_status) populated by the calendar text_sensor in
+//  esp32connector.yaml. /dash meta-refreshes to /?dash=1, which falls
+//  through to ESPHome's built-in web_server entities dashboard.
 // ────────────────────────────────────────────────────────────────
 #pragma once
 

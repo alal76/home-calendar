@@ -5,16 +5,28 @@ Persistent context for the home-calendar project. Copilot reads
 
 ## Project
 
+See [CLAUDE.md](../CLAUDE.md) at repo root for the full project brief —
+this file is the Copilot-specific mirror of the same facts.
+
 A wall-mounted home calendar display:
-- **Device:** `esp32connector` at **esp32connector.local** — ESP32-S3-DevKitC-1
-  (Heemol N16R8 module with antenna interface)
-- **Display:** Waveshare 7.5" e-Paper HAT (B) — BWR 800×480 (WS-13505)
-- **Firmware:** **ESPHome YAML** managed by Home Assistant at **your-home-assistant-host**
+- **Device:** `esp32connector` — ESP32-S3-DevKitC-1 (Heemol N16R8 module with
+  antenna interface). Reachable at **`esp32connector.local`** (mDNS) — the
+  LAN IP is DHCP-assigned and changes, so never hardcode a numeric IP in
+  docs or code; use the hostname (derived from `substitutions.device_name`).
+- **Display:** Waveshare 7.5" e-Paper HAT (B) **V3**, three-colour BWR,
+  800×480 (WS-13505 V3) — ESPHome model id `7.50in-bv3-bwr`.
+- **Firmware:** **ESPHome YAML** managed by Home Assistant (paired via HA's
+  UI: **Settings → Devices & Services → + Add Integration → ESPHome** — no
+  `configuration.yaml` editing needed to add/re-add the device).
 - **Data source:** Home Assistant's built-in **Google Calendar** integration.
   A HA template sensor (`sensor.calendar_events_json`) re-runs
   `calendar.get_events` every 5 min and exposes the events list as the
-  `events` attribute; the device subscribes via the ESPHome native API.
-- **Integration UI:** Home Assistant (no separate web dashboard on the device)
+  `events` attribute; the device subscribes via the ESPHome native API. This
+  template sensor + its refresh script can be defined either as HA YAML
+  (`configuration.yaml`) or as HA UI Helpers/Scripts — see
+  [esphome/README.md](../esphome/README.md#2-add-the-template-sensor--refresh-script-to-ha).
+- **Integration UI:** Home Assistant (no separate web dashboard on the
+  device itself, though `preview_page` serves a debug view at `/preview`).
 
 The Arduino/PlatformIO firmware that previously lived in `src/` was retired
 when the device was adopted into ESPHome — do not suggest restoring it. An
@@ -23,8 +35,10 @@ has been fully removed — do not suggest reintroducing it.
 
 ## Critical hardware constraints
 
-- The display is **3-colour BWR** — ESPHome model id is `7.50in-bv2`
-  (or `7.50in-bv3` for the newer V3 board).
+- The display is **3-colour BWR, V3 board** — ESPHome model id is
+  `7.50in-bv3-bwr`. Do **not** use plain `7.50in-bv3` (that's the V3 board's
+  B/W-only variant) or `7.50in-bv2` (older V2 hardware) — either garbles the
+  picture on this panel.
 - BWR has **no partial refresh**. Every update is a full 15–20 s repaint —
   this is expected, never treat it as a bug.
 - **GPIO0** is the BOOT strap button — avoid assigning as a normal GPIO unless intentional.
@@ -46,6 +60,7 @@ varies by vendor for S3 clones.
 | EPD DC | 4 |
 | EPD RST | 3 |
 | EPD BUSY | 2 |
+| EPD PWR (panel power enable, Rev 2.3+ HAT) | 1 |
 | Button | 0 |
 | I2S out (DAC) BCLK/LRC/DIN | 15/16/17 |
 | I2S in (mic) SCK/WS/SD | 18/45/14 |
@@ -108,6 +123,33 @@ varies by vendor for S3 clones.
 - Don't suggest `esphome run`, `esphome compile` from the Mac,
   or anything PlatformIO/Arduino-related.
 
+## Debugging a "device won't boot / won't show data" report
+
+Work through these in order — most "not booting" reports turn out to be one
+of the later, non-boot layers:
+
+1. **Serial boot log** — plug the board's UART port (CH343 chip) into a Mac;
+   it enumerates as `/dev/cu.usbmodem*`, *not* `/dev/tty.usbserial-*`. Read
+   it directly (e.g. `pyserial`, 115200 baud) to see the ROM bootloader →
+   ESP-IDF → ESPHome `setup()` sequence. If you see `setup() finished
+   successfully!`, the firmware boots fine — the real issue is elsewhere.
+2. **Network reachability** — `ping esp32connector.local` (mDNS) and
+   `curl http://esp32connector.local/preview` (the local debug dashboard,
+   port 80). Both working confirms WiFi + the device's own web server are
+   fine, independent of Home Assistant.
+3. **Native API port** — `nc -z esp32connector.local 6053` confirms the
+   ESPHome API server is listening for HA to connect to.
+4. **Home Assistant side** — entities for this device show as `unavailable`
+   in HA when the API link is down, even though the device itself is
+   healthy (steps 1-3 all pass). Check `last_changed` on one of the
+   device's entities via HA's REST API
+   (`GET /api/states/<entity_id>` with a long-lived access token) — a stale
+   `unavailable` timestamp from days ago means HA lost/never re-established
+   the connection, most often a cached stale IP or a changed
+   `api_encryption_key`. Fix: HA → Settings → Devices & Services → ESPHome →
+   the device entry → **Reload** (or delete/re-add per the pairing steps in
+   [esphome/README.md](../esphome/README.md)).
+
 ## When suggesting changes
 
 - All code changes are YAML + ESPHome lambda C++ (a restricted subset — no
@@ -115,6 +157,12 @@ varies by vendor for S3 clones.
 - For new entities exposed to Home Assistant, prefer the standard ESPHome
   platforms (`sensor`, `text_sensor`, `binary_sensor`, `button`, `switch`,
   `number`, `select`) over custom components.
-- HA-side configuration (template sensor, scripts, automations) lives in
-  `/config/configuration.yaml` on the HA box, not in this repo. Reference
-  it but don't try to edit it from here.
+- HA-side configuration (template sensor, scripts, automations) lives on the
+  HA box — either in `/config/configuration.yaml` or as UI-defined
+  Helpers/Scripts — not in this repo. Reference it but don't try to edit it
+  from here.
+- The ESPHome↔HA device pairing itself is always UI-driven on the HA side
+  (**Settings → Devices & Services → + Add Integration → ESPHome**, a
+  config-flow integration) — never suggest a YAML `esphome:` platform entry
+  in HA's `configuration.yaml` for this, that's the legacy pre-config-flow
+  pattern.

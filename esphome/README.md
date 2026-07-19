@@ -1,8 +1,9 @@
 # ESPHome rewrite — `esp32connector`
 
 This directory replaces the Arduino firmware in `src/` for the device already
-running ESPHome at **esp32connector.local**, managed by Home Assistant at
-**your-home-assistant-host**.
+running ESPHome, reachable at **`esp32connector.local`** (mDNS — the LAN IP
+is DHCP-assigned and can change, so don't hardcode it), managed by your Home
+Assistant instance.
 
 The Arduino code in `src/` and `include/` is kept as design reference but is
 no longer the target build path.
@@ -14,7 +15,7 @@ no longer the target build path.
 | Concern              | Arduino firmware                  | ESPHome rewrite                                |
 |----------------------|-----------------------------------|------------------------------------------------|
 | Calendar fetch       | `HTTPClient` + ArduinoJson v7     | HA `calendar.get_events` → template sensor → ESPHome `text_sensor` |
-| Display              | `GxEPD2_3C<GxEPD2_750c>`          | `waveshare_epaper` (`model: 7.50in-bv2`)       |
+| Display              | `GxEPD2_3C<GxEPD2_750c>`          | `waveshare_epaper` (`model: 7.50in-bv3-bwr`)   |
 | Web UI               | `ESPAsyncWebServer` dashboard     | Home Assistant (native API + `button` entity)  |
 | Config storage       | NVS `Preferences`                 | `substitutions:` (recompile to change)         |
 | OTA                  | `ArduinoOTA`                      | `ota:` (ESPHome dashboard, wireless)           |
@@ -46,10 +47,23 @@ calendar you allow it to see (e.g. `calendar.yourname_gmail_com`).
 
 ### 2. Add the template sensor + refresh script to HA
 
-Add this to `/config/configuration.yaml` (or split file) and reload YAML /
-restart HA. It queries three calendars at once and merges them into a single
-JSON list sorted by start time. Adjust the `entity_id:` list if you want
-different calendars.
+**Option A — YAML (shown below).** Add this to `/config/configuration.yaml`
+(or split file) and reload YAML / restart HA. It queries three calendars at
+once and merges them into a single JSON list sorted by start time. Adjust the
+`entity_id:` list if you want different calendars.
+
+**Option B — UI, no `configuration.yaml` editing.** Both pieces can also be
+created entirely from the HA UI if you'd rather not hand-edit YAML files:
+- Template sensor: **Settings → Devices & Services → Helpers → + Create
+  Helper → Template → Template a sensor**, then switch the helper's editor to
+  YAML mode (⋮ menu → **Edit in YAML**) and paste the `sensor:` block's
+  contents below.
+- Refresh script: **Settings → Automations & Scenes → Scripts → + Add
+  Script**, then ⋮ menu → **Edit in YAML** and paste the `script:` block's
+  contents below.
+
+Either way you end up with the same `sensor.calendar_events_json` and
+`script.refresh_home_calendar` entities that the device subscribes to.
 
 ```yaml
 # /config/configuration.yaml
@@ -107,6 +121,16 @@ of [esp32connector.yaml](esp32connector.yaml) to match.
 
 Home Assistant → **Settings → Add-ons → ESPHome → Open Web UI**.
 
+If the device was flashed via the ESPHome dashboard *add-on* (as above), HA
+picks it up automatically — no separate pairing step needed. If you're
+instead pointing a standalone `esphome` CLI/dashboard at the device, or the
+device's HA integration entry was ever deleted, pair it from the HA UI:
+**Settings → Devices & Services → + Add Integration → ESPHome** — HA
+discovers it via mDNS as `esp32connector`, or you can type the hostname/IP
+and port `6053` manually. HA will prompt for the `api_encryption_key` (same
+value as in `secrets.yaml`). This is entirely UI-driven — no
+`configuration.yaml` edit required to add or re-add the device.
+
 ### 4. Replace the existing `esp32connector.yaml`
 
 In the ESPHome dashboard, click your `esp32connector` device → **EDIT**.
@@ -136,8 +160,10 @@ whenever the device is not reachable over WiFi.
    on the Heemol N16R8 this is the port closest to the 5V/GND end of the board).
 2. In the ESPHome dashboard, open `esp32connector` → click **INSTALL**.
 3. Choose **"Plug into this computer"** (not Wirelessly).
-4. Select the serial port that appears (`/dev/tty.usbserial-*` on macOS,
-   `COMx` on Windows).
+4. Select the serial port that appears — on macOS this shows up as
+   `/dev/cu.usbmodem*` for the CH343 chip on this board (not
+   `/dev/tty.usbserial-*`, which is the older CP210x/CH340 naming); on
+   Windows it's `COMx`.
 5. ESPHome compiles and flashes the firmware over the cable (~10–30 s).
 6. On first boot, `improv_serial` advertises over the serial connection.
    The ESPHome dashboard detects this and prompts for your WiFi credentials.
@@ -153,7 +179,7 @@ Once the device is online, all future firmware updates go wireless:
 
 1. Edit the yaml in the ESPHome dashboard.
 2. Click **SAVE → INSTALL → Wirelessly**.
-3. ESPHome compiles inside the addon and OTAs to esp32connector.local.
+3. ESPHome compiles inside the addon and OTAs to `esp32connector.local`.
    First compile of a fresh toolchain version pulls fonts and esp-idf
    (~5 min). Subsequent installs are fast (~1–2 min).
 
@@ -182,7 +208,7 @@ All tunables live in `substitutions:` at the top of
 | Weather entity                    | `substitutions.weather_entity` (default `weather.forecast_home`) |
 | Refresh cadence (default 5 min)   | HA template sensor `time_pattern` trigger (in HA config) |
 | Timezone (currently CET/CEST)     | `substitutions.tz` (POSIX TZ string)                     |
-| BWR display model (v2 vs v3)      | `display[0].model` — try `7.50in-bv3` if v2 ghosts       |
+| Display model (board rev)         | `display[0].model` — `7.50in-bv3-bwr` (V3, current), `7.50in-bv2` (V2)  |
 | Cell-label truncation (9 chars)   | `label.resize(9)` in the display lambda                  |
 | Sidebar title truncation (22)     | `t.resize(21)` in the display lambda                     |
 | Sidebar max events (10)           | `shown < 10` check in the display lambda                 |
@@ -213,9 +239,13 @@ display update without waiting for the 5-minute interval.
 
 ## Known caveats
 
-1. **BWR model name.** `7.50in-bv2` covers the most common Waveshare 7.5" V2
-   B/W/R 800×480 HAT B (Waveshare part WS-13505). If yours is a newer V3 board
-   the picture will be garbled — change the model to `7.50in-bv3` and rebuild.
+1. **BWR model name.** This device uses a **V3** board, so
+   [esp32connector.yaml](esp32connector.yaml) is set to `model: 7.50in-bv3-bwr`
+   (three-colour V3, Waveshare part WS-13505 V3). If you're on the older V2
+   board use `7.50in-bv2` instead (B/W/R, no `-bwr` suffix); using the wrong
+   one for your hardware garbles the picture. Plain `7.50in-bv3` (no `-bwr`)
+   is the V3 board's **black/white-only** variant — don't use it here, the
+   panel is three-colour.
 2. **No partial refresh.** Each update is a full 15–20 s repaint. Don't
    shorten the HA template-sensor cadence below ~2 min or you'll burn the panel.
 3. **ESP32-S3 framework.** The yaml uses `esp-idf` (not Arduino) for stable,

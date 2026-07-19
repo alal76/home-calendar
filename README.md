@@ -9,7 +9,7 @@ device over the native API.
 Source: <https://github.com/alal76/home-calendar>
 
 ```
-Google Calendar ──► Home Assistant (your-home-assistant-host)
+Google Calendar ──► Home Assistant (your HA host, e.g. homeassistant.local:8123)
                        │  • Google Calendar integration  (OAuth + polling)
                        │  • template sensor every 5 min
                        │      sensor.calendar_events_json  (attribute: events)
@@ -20,6 +20,13 @@ Google Calendar ──► Home Assistant (your-home-assistant-host)
                   esp32connector (esp32connector.local)  ──►  7.5" BWR panel
                                                        renders 800×480 layout
 ```
+
+> The device gets its IP from DHCP, which can change — always address it by
+> its mDNS hostname (`${device_name}.local`, i.e. `esp32connector.local` by
+> default) rather than a hardcoded IP. Change `substitutions.device_name` in
+> [esp32connector.yaml](esphome/esp32connector.yaml) to rename it everywhere
+> at once. For a predictable numeric IP, set a DHCP reservation for the
+> device's MAC address on your router instead of hardcoding one in docs.
 
 The ESP32 never talks to Google directly — only to Home Assistant.
 
@@ -67,7 +74,14 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 1. ESPHome dashboard → `esp32connector` → **EDIT**
 2. Preserve the existing `api: encryption: key:` value
 3. Paste the contents of [esphome/esp32connector.yaml](esphome/esp32connector.yaml)
-4. **INSTALL → Wirelessly** — OTAs to esp32connector.local
+4. **INSTALL → Wirelessly** — OTAs to `esp32connector.local`
+
+If Home Assistant doesn't already know about the device (fresh HA instance,
+or the ESPHome integration entry was removed), pair it from the HA UI:
+**Settings → Devices & Services → + Add Integration → ESPHome** — HA
+auto-discovers it via mDNS as `esp32connector`, or enter the hostname/IP and
+port `6053` manually. You'll be prompted for the `api_encryption_key` from
+`secrets.yaml`. No `configuration.yaml` editing is required for this step.
 
 ---
 
@@ -98,7 +112,7 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 ├────────────────────────────┴───────────────────┤
 │ Updated …   3 past   1 today   13 upcoming           │   80 px footer
 │ Next: 06 Jul · in 8d — Dentist appointment           │
-│ WiFi … · IP … · Up …         esp32connector v1.1.0  │
+│ WiFi … · IP … · Up …         esp32connector v1.2.0  │
 │ Person A: home · Person B: home · Person C: home · Person D: home
 └─────────────────────────────────────────────────┘
 ```
@@ -111,7 +125,9 @@ this calendar firmware, follow [esphome/README.md](esphome/README.md):
 - **Footer row 4** shows each tracked person as `Label: zone (NN km/h)`. The
   speed suffix is omitted if the speed sensor is unavailable or < 1 m/s.
 - **Version** is exposed to HA as the diagnostic
-  `sensor.<device>_home_calendar_version` (currently `1.1.0`).
+  `sensor.<device>_home_calendar_version` — sourced from
+  `substitutions.sw_version` in [esp32connector.yaml](esphome/esp32connector.yaml)
+  (currently `1.2.0`; bump that substitution, don't hardcode the number here).
 
 ---
 
