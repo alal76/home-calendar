@@ -39,8 +39,16 @@ substitutions:
   ha_refresh_script: "script.refresh_home_calendar"
   # POSIX TZ string — adjust for your location
   tz: "CET-1CEST,M3.5.0,M10.5.0/3"
+  # HA's built-in Met.no integration names this weather.forecast_<zone name>
+  # — default matches HA's own default "Home" zone.
+  weather_entity: "weather.forecast_home"
 
   # ── People tracked on the footer ──
+  # Replace all 8 values below with your own household's HA person/speed
+  # entities (Settings → People in HA gives you the person.* ids). Leave a
+  # slot pointing at a nonexistent entity if you have fewer than 4 people —
+  # the device tolerates missing/unavailable entities and just omits that
+  # footer segment.
   # state = zone name when in a known zone ("home", "work", …) or
   # "not_home". The matching *_speed sensors come from the HA
   # Companion App and are off by default — enable "Speed" under
@@ -386,10 +394,10 @@ text_sensor:
   # ── Weather subscription (HA Met.no built-in, no API key needed) ──
   - platform: homeassistant
     id: weather_state
-    entity_id: weather.forecast_home
+    entity_id: ${weather_entity}
   - platform: homeassistant
     id: weather_temp
-    entity_id: weather.forecast_home
+    entity_id: ${weather_entity}
     attribute: temperature
 
   # ── People location + speed (Companion App). Speed sensors are

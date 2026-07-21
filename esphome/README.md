@@ -80,6 +80,8 @@ template:
       - service: calendar.get_events
         target:
           entity_id:
+            # Replace with your own calendar.* entities (as many as you
+            # like — this example merges three).
             - calendar.yourname_gmail_com
             - calendar.family
             - calendar.work

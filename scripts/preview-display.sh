@@ -8,7 +8,7 @@
 # ────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-HA_HOST="${HA_HOST:-your-home-assistant-host}"
+HA_HOST="${HA_HOST:-homeassistant.local}"
 HA_PORT="${HA_PORT:-22}"
 HA_USER="${HA_USER:-root}"
 

@@ -42,9 +42,13 @@ home-calendar/
 │   │                                  serving GET /preview + /dash
 │   ├── secrets.example.yaml         ← keys to add to /config/esphome/secrets.yaml
 │   └── README.md                    ← deploy steps + HA template-sensor snippet
-├── scripts/                         ← dev helpers (browser preview, etc.)
-├── preview.html                     ← static preview snapshot (offline reference)
+├── scripts/                         ← dev helpers, incl. preview-display.sh, which
+│                                       generates a git-ignored local preview.html
+│                                       (never commit it — it mirrors live HA data)
+├── docs/                            ← wiring diagram SVGs
+├── INSTALL.md                       ← complete install + build guide
 ├── WIRING.md                        ← pin map + cabling reference
+├── CLAUDE.md                        ← persistent Claude Code context
 └── .github/
     └── copilot-instructions.md      ← persistent Copilot context
 ```
@@ -113,7 +117,7 @@ port `6053` manually. You'll be prompted for the `api_encryption_key` from
 │ Updated …   3 past   1 today   13 upcoming           │   80 px footer
 │ Next: 06 Jul · in 8d — Dentist appointment           │
 │ WiFi … · IP … · Up …         esp32connector v1.2.0  │
-│ Person A: home · Person B: home · Person C: home · Person D: home
+│ Person A: home · Person B: work · Person C: school · Person D: not_home
 └─────────────────────────────────────────────────┘
 ```
 
