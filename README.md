@@ -8,6 +8,9 @@ device over the native API.
 
 Source: <https://github.com/alal76/home-calendar>
 
+**New build? Start with [INSTALL.md](INSTALL.md)** for the complete parts
+list, wiring, Home Assistant setup, and firmware configuration walkthrough.
+
 ```
 Google Calendar ──► Home Assistant (your HA host, e.g. homeassistant.local:8123)
                        │  • Google Calendar integration  (OAuth + polling)
@@ -57,35 +60,28 @@ home-calendar/
 
 ## Quick start
 
-### 1. Home Assistant (one time)
+**Building this for the first time? Use [INSTALL.md](INSTALL.md)** — the
+complete, no-steps-skipped guide: parts list, wiring, Home Assistant setup,
+per-household firmware configuration, first flash, and verification. The
+summary below assumes you've already read it.
 
-1. **Add the Google Calendar integration**
-   HA → **Settings → Devices & Services → + Add Integration → Google Calendar**.
-   Walk through the OAuth flow; HA creates one `calendar.*` entity per
-   calendar you authorise.
-2. **Add the template sensor + refresh script** to `/config/configuration.yaml`
-   so HA exposes the events as JSON for the device to subscribe to.
-   Full snippet is in [esphome/README.md](esphome/README.md#2-add-the-template-sensor--refresh-script-to-ha).
-3. Restart HA (or call **Developer Tools → YAML → Reload Template Entities**)
-   and confirm `sensor.calendar_events_json` exists with an `events` attribute
-   containing a JSON array.
-
-### 2. ESPHome device
-
-The device `esp32connector` already exists in Home Assistant. To install
-this calendar firmware, follow [esphome/README.md](esphome/README.md):
-
-1. ESPHome dashboard → `esp32connector` → **EDIT**
-2. Preserve the existing `api: encryption: key:` value
-3. Paste the contents of [esphome/esp32connector.yaml](esphome/esp32connector.yaml)
-4. **INSTALL → Wirelessly** — OTAs to `esp32connector.local`
-
-If Home Assistant doesn't already know about the device (fresh HA instance,
-or the ESPHome integration entry was removed), pair it from the HA UI:
-**Settings → Devices & Services → + Add Integration → ESPHome** — HA
-auto-discovers it via mDNS as `esp32connector`, or enter the hostname/IP and
-port `6053` manually. You'll be prompted for the `api_encryption_key` from
-`secrets.yaml`. No `configuration.yaml` editing is required for this step.
+1. **Home Assistant**: add the Google Calendar integration (**Settings →
+   Devices & Services → + Add Integration → Google Calendar**), then add the
+   template sensor + refresh script from
+   [esphome/README.md](esphome/README.md#2-add-the-template-sensor--refresh-script-to-ha)
+   pointed at your own calendars. Confirm
+   `sensor.calendar_events_json` populates with an `events` attribute.
+2. **Firmware**: edit the `substitutions:` block at the top of
+   [esp32connector.yaml](esphome/esp32connector.yaml) with your own device
+   name, timezone, HA entity ids, and household members (see
+   [INSTALL.md § 4](INSTALL.md#4-configure-the-firmware-for-your-household)
+   for the full list) — nothing else needs to change for a standard install.
+3. **Flash**: ESPHome dashboard → paste in the yaml → **INSTALL → Plug into
+   this computer** for a first flash, **Wirelessly** for every update after.
+4. **Pair with HA** (if not auto-discovered): **Settings → Devices &
+   Services → + Add Integration → ESPHome** — mDNS-discovered or entered
+   manually by hostname/IP + port `6053`. Fully UI-driven, no
+   `configuration.yaml` editing required.
 
 ---
 

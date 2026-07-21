@@ -49,9 +49,11 @@ home-calendar/
 │   ├── components/preview_page/     ← local external_component (GET /preview, /dash)
 │   ├── secrets.example.yaml         ← keys to add to /config/esphome/secrets.yaml
 │   └── README.md                    ← deploy steps + HA template-sensor snippet
-├── scripts/                         ← dev helpers (browser preview, etc.)
+├── scripts/                         ← dev helpers, incl. preview-display.sh, which
+│                                       generates a git-ignored local preview.html
+│                                       (never commit it — mirrors live HA data)
 ├── docs/                            ← wiring diagram SVGs
-├── preview.html                     ← static preview snapshot (offline reference)
+├── INSTALL.md                       ← complete install + build guide
 ├── WIRING.md                        ← pin map + cabling reference
 ├── README.md                        ← project overview, architecture, quick start
 └── .github/copilot-instructions.md  ← Copilot's mirror of this file
